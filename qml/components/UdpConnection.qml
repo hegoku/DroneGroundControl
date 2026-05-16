@@ -51,7 +51,7 @@ Item {
             id: remotePortInput
             width: 96
             height: parent.height
-            text: "14550"
+            text: "1234"
             color: "white"
             selectedTextColor: "white"
             selectionColor: "#4c8bf5"
@@ -179,7 +179,7 @@ Item {
                             id: localListenPortInput
                             width: parent.width - 124 - parent.spacing
                             height: parent.height
-                            text: "14551"
+                            text: "1234"
                             color: "white"
                             selectedTextColor: "white"
                             selectionColor: "#4c8bf5"

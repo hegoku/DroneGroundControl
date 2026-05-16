@@ -6,7 +6,7 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_AUTORCC ON)
 
-find_package(Qt6 REQUIRED COMPONENTS Quick SerialPort Graphs)
+find_package(Qt6 REQUIRED COMPONENTS Quick SerialPort Network Graphs)
 
 qt_standard_project_setup(REQUIRES 6.5)
 
@@ -32,6 +32,8 @@ qt_add_executable(appDroneGroundControl
     src/connection/ITransport.h
     src/connection/SerialTransport.h
     src/connection/SerialTransport.cpp
+    src/connection/UdpTransport.h
+    src/connection/UdpTransport.cpp
     src/protocol/AnotcFrame.h
     src/protocol/ProtocolTypes.h
     src/protocol/IProtocolSession.h
@@ -75,7 +77,7 @@ set_target_properties(appDroneGroundControl PROPERTIES
 )
 
 target_link_libraries(appDroneGroundControl
-    PRIVATE Qt6::Quick Qt6::SerialPort Qt6::Graphs
+    PRIVATE Qt6::Quick Qt6::SerialPort Qt6::Network Qt6::Graphs
 )
 
 include(GNUInstallDirs)

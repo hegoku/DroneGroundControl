@@ -46,6 +46,18 @@ ApplicationWindow {
                     connectionBusy = false
             }
 
+            function connectUdp() {
+                if (connectionBusy)
+                    return
+
+                connectionBusy = true
+                var opened = droneSession.openUdp(udpConnection.host,
+                                                  Number(udpConnection.remotePort),
+                                                  Number(udpConnection.localListenPort))
+                if (!opened)
+                    connectionBusy = false
+            }
+
             anchors.centerIn: parent
             height: parent.height
             width: parent.width
@@ -61,6 +73,8 @@ ApplicationWindow {
                         flight.reset()
                     } else if (topBar.connectionMode === "serial") {
                         topBar.connectSerial()
+                    } else if (topBar.connectionMode === "udp") {
+                        topBar.connectUdp()
                     }
                 }
                 height: parent.height

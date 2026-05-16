@@ -1,6 +1,7 @@
 #include "ConnectionSession.h"
 
 #include "../connection/SerialTransport.h"
+#include "../connection/UdpTransport.h"
 #include "../protocol/AnotcProtocolSession.h"
 
 #include <QMetaObject>
@@ -179,6 +180,50 @@ bool ConnectionSession::openSerial(const QString &portName,
     return opened;
 }
 
+bool ConnectionSession::openUdp(const QString &host, int remotePort, int localPort)
+{
+    const QString trimmedHost = host.trimmed();
+    if (trimmedHost.isEmpty()) {
+        setLastError(QStringLiteral("UDP host is empty."));
+        return false;
+    }
+    if (remotePort <= 0 || remotePort > 65535) {
+        setLastError(QStringLiteral("UDP remote port is out of range."));
+        return false;
+    }
+    if (localPort <= 0 || localPort > 65535) {
+        setLastError(QStringLiteral("UDP local listen port is out of range."));
+        return false;
+    }
+
+    close();
+
+    auto *transport = new UdpTransport;
+    auto protocol = std::make_unique<AnotcProtocolSession>();
+    setTransport(transport);
+    setProtocol(std::move(protocol));
+
+    ConnectionConfig config;
+    config.transportType = ConnectionConfig::TransportType::Udp;
+    config.udpHost = trimmedHost;
+    config.udpRemotePort = static_cast<quint16>(remotePort);
+    config.udpLocalPort = static_cast<quint16>(localPort);
+
+    bool opened = false;
+    QMetaObject::invokeMethod(m_transport,
+                              [&opened, transport, config]() {
+                                  opened = transport->open(config);
+                              },
+                              Qt::BlockingQueuedConnection);
+
+    if (!opened) {
+        resetConnectionObjects();
+        return false;
+    }
+
+    return opened;
+}
+
 void ConnectionSession::close()
 {
     m_requestManager.cancelAll(QStringLiteral("Connection closed."));
@@ -248,7 +293,7 @@ void ConnectionSession::setTransport(ITransport *transport)
 
     connect(m_transport, &ITransport::performanceStats, this, [this](const TransportPerformanceStats &stats) {
         emit performanceStats(stats);
-        emit log(QStringLiteral("Serial stats: bytes/s=%1 feedBytes/s=%2 parsedFrames/s=%3 totalParsed=%4 checksumErrors=%5 lengthErrors=%6")
+        emit log(QStringLiteral("Transport stats: bytes/s=%1 feedBytes/s=%2 parsedFrames/s=%3 totalParsed=%4 checksumErrors=%5 lengthErrors=%6")
                      .arg(stats.bytesPerSecond, 0, 'f', 0)
                      .arg(stats.feedBytesCallsPerSecond, 0, 'f', 0)
                      .arg(stats.framesParsedPerSecond, 0, 'f', 0)

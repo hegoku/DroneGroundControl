@@ -41,6 +41,7 @@ public:
                                 int dataBits,
                                 const QString &parity,
                                 const QString &stopBit);
+    Q_INVOKABLE bool openUdp(const QString &host, int remotePort, int localPort);
     Q_INVOKABLE void close();
     Q_INVOKABLE void closeWithDisconnectCommand();
     Q_INVOKABLE void sendBytes(const QByteArray &data);
