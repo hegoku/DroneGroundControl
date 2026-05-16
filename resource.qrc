@@ -1,0 +1,29 @@
+<RCC>
+    <qresource prefix="/">
+        <file>resources/icons/sensor_gyro_on.png</file>
+        <file>resources/icons/sensor_gyro_off.png</file>
+        <file>resources/icons/sensor_mag_on.png</file>
+        <file>resources/icons/sensor_mag_off.png</file>
+        <file>resources/icons/sensor_baro_on.png</file>
+        <file>resources/icons/sensor_baro_off.png</file>
+        <file>resources/icons/plugin.svg</file>
+        <file>resources/icons/play.svg</file>
+        <file>resources/icons/pauze.svg</file>
+        <file>resources/icons/cross.svg</file>
+        <file>resources/icons/refresh.svg</file>
+        <file>resources/icons/save.svg</file>
+        <file>resources/icons/folder.svg</file>
+        <file>resources/icons/plus.svg</file>
+        <file>resources/icons/view.svg</file>
+        <file>resources/icons/hide.svg</file>
+        <file>resources/icons/trash.svg</file>
+        <file>resources/icons/chevron-down.svg</file>
+        <file>resources/icons/chevron-right.svg</file>
+        <file>resources/DataFrameDefination.json</file>
+        <file>qml/pages/HomePage.qml</file>
+        <file>qml/pages/DataFrameTablePage.qml</file>
+        <file>resources/icons/drag-arrow.svg</file>
+        <file>resources/icons/target.svg</file>
+        <file>resources/icons/crop.svg</file>
+    </qresource>
+</RCC>
