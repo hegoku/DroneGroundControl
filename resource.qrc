@@ -21,6 +21,7 @@
         <file>resources/icons/chevron-right.svg</file>
         <file>resources/DataFrameDefination.json</file>
         <file>qml/pages/HomePage.qml</file>
+        <file>qml/pages/ParameterPage.qml</file>
         <file>qml/pages/DataFrameTablePage.qml</file>
         <file>resources/icons/drag-arrow.svg</file>
         <file>resources/icons/target.svg</file>

@@ -22,6 +22,8 @@ ConnectionSession::ConnectionSession(QObject *parent)
     qRegisterMetaType<TransportPerformanceStats>("TransportPerformanceStats");
     qRegisterMetaType<Command>("Command");
 
+    m_parameterStore.setConnectionSession(this);
+
     connect(&m_requestManager, &AnotcRequestManager::sendBytes, this, &ConnectionSession::sendBytes);
     connect(&m_requestManager, &AnotcRequestManager::log, this, &ConnectionSession::log);
     connect(&m_requestManager,
@@ -114,6 +116,11 @@ void ConnectionSession::setRawByteForwardingEnabled(bool enabled)
     }
 
     emit rawByteForwardingEnabledChanged();
+}
+
+ParameterStore *ConnectionSession::parameterStore()
+{
+    return &m_parameterStore;
 }
 
 QStringList ConnectionSession::availableSerialPorts() const
@@ -269,8 +276,6 @@ void ConnectionSession::setTransport(ITransport *transport)
     }, Qt::QueuedConnection);
 
     connect(m_transport, &ITransport::anotcFramesReceived, this, [this](const AnotcParseResult &result) {
-        m_requestManager.handleFrames(result);
-
         if (!result.telemetryFrames.isEmpty()) {
             emit telemetryFramesReceived(result.telemetryFrames);
         }
@@ -289,6 +294,8 @@ void ConnectionSession::setTransport(ITransport *transport)
         if (!result.unknownFrames.isEmpty()) {
             emit unknownFramesReceived(result.unknownFrames);
         }
+
+        m_requestManager.handleFrames(result);
     }, Qt::QueuedConnection);
 
     connect(m_transport, &ITransport::performanceStats, this, [this](const TransportPerformanceStats &stats) {
@@ -463,6 +470,76 @@ quint64 ConnectionSession::writeParameterRaw(int parameterId,
                          onFailure);
 }
 
+quint64 ConnectionSession::requestParameterCount(RequestSuccessHandler onSuccess,
+                                                 RequestFailureHandler onFailure)
+{
+    return submitRequest(AnotcRequestManager::makeReadParameterCountRequest(),
+                         std::move(onSuccess),
+                         std::move(onFailure));
+}
+
+quint64 ConnectionSession::requestParameterValue(int parameterId,
+                                                 RequestSuccessHandler onSuccess,
+                                                 RequestFailureHandler onFailure)
+{
+    if (!isU16Value(parameterId)) {
+        setLastError(QStringLiteral("Parameter id is out of range."));
+        if (onFailure) {
+            onFailure(lastError());
+        }
+        return 0;
+    }
+
+    return submitRequest(AnotcRequestManager::makeReadParameterValueRequest(static_cast<quint16>(parameterId)),
+                         std::move(onSuccess),
+                         std::move(onFailure));
+}
+
+quint64 ConnectionSession::requestParameterInfo(int parameterId,
+                                                RequestSuccessHandler onSuccess,
+                                                RequestFailureHandler onFailure)
+{
+    if (!isU16Value(parameterId)) {
+        setLastError(QStringLiteral("Parameter id is out of range."));
+        if (onFailure) {
+            onFailure(lastError());
+        }
+        return 0;
+    }
+
+    return submitRequest(AnotcRequestManager::makeReadParameterInfoRequest(static_cast<quint16>(parameterId)),
+                         std::move(onSuccess),
+                         std::move(onFailure));
+}
+
+quint64 ConnectionSession::writeParameterRaw(int parameterId,
+                                             const QString &valueHex,
+                                             RequestSuccessHandler onSuccess,
+                                             RequestFailureHandler onFailure)
+{
+    if (!isU16Value(parameterId)) {
+        setLastError(QStringLiteral("Parameter id is out of range."));
+        if (onFailure) {
+            onFailure(lastError());
+        }
+        return 0;
+    }
+
+    bool ok = false;
+    const QByteArray value = bytesFromHex(valueHex, &ok);
+    if (!ok) {
+        setLastError(QStringLiteral("Parameter value hex is invalid."));
+        if (onFailure) {
+            onFailure(lastError());
+        }
+        return 0;
+    }
+
+    return submitRequest(AnotcRequestManager::makeWriteParameterRequest(static_cast<quint16>(parameterId), value),
+                         std::move(onSuccess),
+                         std::move(onFailure));
+}
+
 quint64 ConnectionSession::sendReliableParameterCommand(int command,
                                                         int value,
                                                         const QJSValue &onSuccess,
@@ -584,6 +661,24 @@ quint64 ConnectionSession::submitRequest(const AnotcRequest &request,
     return requestId;
 }
 
+quint64 ConnectionSession::submitRequest(const AnotcRequest &request,
+                                         RequestSuccessHandler onSuccess,
+                                         RequestFailureHandler onFailure)
+{
+    const quint64 requestId = submitRequest(request);
+    if (requestId == 0) {
+        if (onFailure) {
+            onFailure(lastError());
+        }
+        return 0;
+    }
+
+    if (onSuccess || onFailure) {
+        m_cppRequestCallbacks.insert(requestId, CppCallbacks { std::move(onSuccess), std::move(onFailure) });
+    }
+    return requestId;
+}
+
 void ConnectionSession::storeRequestCallbacks(quint64 requestId,
                                               const QJSValue &onSuccess,
                                               const QJSValue &onFailure)
@@ -612,6 +707,9 @@ void ConnectionSession::invokeRequestSuccess(quint64 requestId,
 {
     const JsCallbacks callbacks = m_requestCallbacks.take(requestId);
     invokeSuccessCallback(callbacks.onSuccess, requestId, name, response);
+
+    const CppCallbacks cppCallbacks = m_cppRequestCallbacks.take(requestId);
+    invokeSuccessCallback(cppCallbacks.onSuccess, requestId, name, response);
 }
 
 void ConnectionSession::invokeRequestFailure(quint64 requestId,
@@ -620,6 +718,9 @@ void ConnectionSession::invokeRequestFailure(quint64 requestId,
 {
     const JsCallbacks callbacks = m_requestCallbacks.take(requestId);
     invokeFailureCallback(callbacks.onFailure, requestId, name, reason);
+
+    const CppCallbacks cppCallbacks = m_cppRequestCallbacks.take(requestId);
+    invokeFailureCallback(cppCallbacks.onFailure, requestId, name, reason);
 }
 
 void ConnectionSession::invokeSequenceSuccess(quint64 sequenceId,
@@ -661,6 +762,18 @@ void ConnectionSession::invokeSuccessCallback(const QJSValue &callback,
     callable.call({ engine->toScriptValue(payload) });
 }
 
+void ConnectionSession::invokeSuccessCallback(const RequestSuccessHandler &callback,
+                                              quint64 id,
+                                              const QString &name,
+                                              const _un_anotc_v8_frame &response)
+{
+    Q_UNUSED(id)
+    Q_UNUSED(name)
+    if (callback) {
+        callback(frameToVariantMap(response));
+    }
+}
+
 void ConnectionSession::invokeFailureCallback(const QJSValue &callback,
                                               quint64 id,
                                               const QString &name,
@@ -684,6 +797,18 @@ void ConnectionSession::invokeFailureCallback(const QJSValue &callback,
     callable.call({ engine->toScriptValue(payload) });
 }
 
+void ConnectionSession::invokeFailureCallback(const RequestFailureHandler &callback,
+                                              quint64 id,
+                                              const QString &name,
+                                              const QString &reason)
+{
+    Q_UNUSED(id)
+    Q_UNUSED(name)
+    if (callback) {
+        callback(reason);
+    }
+}
+
 QVariantMap ConnectionSession::frameToVariantMap(const _un_anotc_v8_frame &frame) const
 {
     QVariantMap map;
@@ -700,14 +825,43 @@ QVariantMap ConnectionSession::frameToVariantMap(const _un_anotc_v8_frame &frame
         map.insert(QStringLiteral("ackFunction"), frame.frame.data[0]);
         map.insert(QStringLiteral("ackSumCheck"), frame.frame.data[1]);
         map.insert(QStringLiteral("ackAddCheck"), frame.frame.data[2]);
-    } else if ((frame.frame.fun == ANOTC_FRAME_CONFIG_READ_WRITE
-         || frame.frame.fun == ANOTC_FRAME_CONFIG_INFO)
-        && length >= 2) {
+        if (length >= 4) {
+            map.insert(QStringLiteral("ackCode"), frame.frame.data[3]);
+            if (frame.frame.data[3] != 0 && length > 4) {
+                map.insert(QStringLiteral("ackMessage"),
+                           QString::fromUtf8(reinterpret_cast<const char *>(frame.frame.data + 4),
+                                             length - 4));
+            }
+        }
+    } else if (frame.frame.fun == ANOTC_FRAME_CONFIG_READ_WRITE && length >= 2) {
         const quint16 parameterId = static_cast<quint16>(frame.frame.data[0])
             | (static_cast<quint16>(frame.frame.data[1]) << 8);
         map.insert(QStringLiteral("parameterId"), parameterId);
         map.insert(QStringLiteral("parameterValueHex"),
                    QString::fromLatin1(payload.mid(2).toHex(' ').toUpper()));
+    } else if (frame.frame.fun == ANOTC_FRAME_CONFIG_INFO && length >= 23) {
+        const quint16 parameterId = static_cast<quint16>(frame.frame.data[0])
+            | (static_cast<quint16>(frame.frame.data[1]) << 8);
+        QByteArray nameBytes(reinterpret_cast<const char *>(frame.frame.data + 3), 20);
+        const int nameTerminator = nameBytes.indexOf('\0');
+        if (nameTerminator >= 0) {
+            nameBytes.truncate(nameTerminator);
+        }
+
+        QByteArray infoBytes;
+        if (length > 23) {
+            infoBytes = QByteArray(reinterpret_cast<const char *>(frame.frame.data + 23),
+                                   length - 23);
+            const int infoTerminator = infoBytes.indexOf('\0');
+            if (infoTerminator >= 0) {
+                infoBytes.truncate(infoTerminator);
+            }
+        }
+
+        map.insert(QStringLiteral("parameterId"), parameterId);
+        map.insert(QStringLiteral("parameterType"), frame.frame.data[2]);
+        map.insert(QStringLiteral("parameterName"), QString::fromUtf8(nameBytes).trimmed());
+        map.insert(QStringLiteral("parameterInfo"), QString::fromUtf8(infoBytes).trimmed());
     } else if (frame.frame.fun == ANOTC_FRAME_CONFIG_CMD && length >= 1) {
         map.insert(QStringLiteral("command"), frame.frame.data[0]);
         if (length >= 3) {

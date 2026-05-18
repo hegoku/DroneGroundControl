@@ -16,6 +16,8 @@ qt_add_executable(appDroneGroundControl
     src/app/ConnectionSession.cpp
     src/app/AnotcRequestManager.h
     src/app/AnotcRequestManager.cpp
+    src/app/ParameterStore.h
+    src/app/ParameterStore.cpp
     src/app/Flight.h
     src/app/Flight.cpp
     src/app/DataChartModel.h
@@ -53,6 +55,7 @@ qt_add_qml_module(appDroneGroundControl
     QML_FILES
         qml/Main.qml
         qml/pages/HomePage.qml
+        qml/pages/ParameterPage.qml
         qml/pages/DataChartPage.qml
         qml/pages/DataChartGraphsPage.qml
         qml/pages/DataFrameTablePage.qml

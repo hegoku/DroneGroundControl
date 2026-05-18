@@ -1,0 +1,544 @@
+#include "ParameterStore.h"
+
+#include "ConnectionSession.h"
+
+#include <QQmlEngine>
+#include <QRegularExpression>
+
+#include <cstring>
+
+ParameterStore::ParameterStore(QObject *parent)
+    : QAbstractListModel(parent)
+{
+}
+
+void ParameterStore::setConnectionSession(ConnectionSession *connectionSession)
+{
+    m_connectionSession = connectionSession;
+}
+
+int ParameterStore::rowCount(const QModelIndex &parent) const
+{
+    return parent.isValid() ? 0 : m_entries.size();
+}
+
+QVariant ParameterStore::data(const QModelIndex &index, int role) const
+{
+    if (!index.isValid() || index.row() < 0 || index.row() >= m_entries.size()) {
+        return {};
+    }
+
+    const Entry &entry = m_entries.at(index.row());
+    switch (role) {
+    case IdRole:
+        return entry.id;
+    case NameRole:
+        return entry.name;
+    case TypeRole:
+        return entry.type;
+    case TypeNameRole:
+        return typeName(entry.type);
+    case ValueRole:
+        return decodeValue(entry.dirty ? entry.draftBytes : entry.valueBytes, entry.type);
+    case ValueHexRole:
+        return QString::fromLatin1((entry.dirty ? entry.draftBytes : entry.valueBytes).toHex(' ').toUpper());
+    case HasDefinitionRole:
+        return entry.hasDefinition;
+    case HasValueRole:
+        return entry.hasValue;
+    case DirtyRole:
+        return entry.dirty;
+    case BusyRole:
+        return entry.busy;
+    case EditableRole:
+        return !entry.busy;
+    case BusyReasonRole:
+        return entry.busyReason;
+    case OwnerRole:
+        return entry.owner;
+    case LastErrorRole:
+        return entry.lastError;
+    case RevisionRole:
+        return QVariant::fromValue(entry.revision);
+    case DescriptionRole:
+        return entry.description;
+    default:
+        return {};
+    }
+}
+
+QHash<int, QByteArray> ParameterStore::roleNames() const
+{
+    return {
+        {IdRole, "parameterId"},
+        {NameRole, "name"},
+        {TypeRole, "type"},
+        {TypeNameRole, "typeName"},
+        {ValueRole, "value"},
+        {ValueHexRole, "valueHex"},
+        {HasDefinitionRole, "hasDefinition"},
+        {HasValueRole, "hasValue"},
+        {DirtyRole, "dirty"},
+        {BusyRole, "busy"},
+        {EditableRole, "editable"},
+        {BusyReasonRole, "busyReason"},
+        {OwnerRole, "owner"},
+        {LastErrorRole, "lastError"},
+        {RevisionRole, "revision"},
+        {DescriptionRole, "description"}
+    };
+}
+
+QVariantMap ParameterStore::parameter(int parameterId) const
+{
+    if (parameterId < 0 || parameterId > 0xFFFF) {
+        return {};
+    }
+
+    const Entry *entry = entryFor(static_cast<quint16>(parameterId));
+    return entry ? entryToMap(*entry) : QVariantMap {};
+}
+
+bool ParameterStore::isBusy(int parameterId) const
+{
+    if (parameterId < 0 || parameterId > 0xFFFF) {
+        return false;
+    }
+
+    const Entry *entry = entryFor(static_cast<quint16>(parameterId));
+    return entry && entry->busy;
+}
+
+bool ParameterStore::isEditable(int parameterId) const
+{
+    return !isBusy(parameterId);
+}
+
+quint64 ParameterStore::refreshParameterValue(int parameterId, const QString &owner)
+{
+    return refreshParameterValue(parameterId, QJSValue(), QJSValue(), owner);
+}
+
+quint64 ParameterStore::refreshParameterValue(int parameterId,
+                                              const QJSValue &onSuccess,
+                                              const QJSValue &onFailure,
+                                              const QString &owner)
+{
+    if (!m_connectionSession || parameterId < 0 || parameterId > 0xFFFF) {
+        const QString message = QStringLiteral("Invalid parameter value refresh request.");
+        emit errorOccurred(message);
+        invokeFailureCallback(onFailure, message);
+        return 0;
+    }
+
+    Entry &entry = ensureEntry(static_cast<quint16>(parameterId));
+    if (entry.busy) {
+        const QString message = QStringLiteral("Parameter %1 is busy.").arg(parameterId);
+        entry.lastError = message;
+        notifyEntryChanged(entry.id);
+        invokeFailureCallback(onFailure, message);
+        return 0;
+    }
+
+    setEntryBusy(&entry, true, QStringLiteral("reading"), owner);
+    notifyEntryChanged(entry.id);
+
+    const quint16 id = static_cast<quint16>(parameterId);
+    const quint64 requestId = m_connectionSession->requestParameterValue(
+        id,
+        [this, onSuccess](const QVariantMap &frame) {
+            applyParameterValue(frame);
+            invokeSuccessCallback(onSuccess, frame);
+        },
+        [this, id, onFailure](const QString &reason) {
+            Entry &entry = ensureEntry(id);
+            entry.lastError = reason;
+            setEntryBusy(&entry, false);
+            ++entry.revision;
+            notifyEntryChanged(id);
+            invokeFailureCallback(onFailure, reason);
+        });
+    entry.activeRequestId = requestId;
+    notifyEntryChanged(entry.id);
+    return requestId;
+}
+
+quint64 ParameterStore::refreshParameterInfo(int parameterId, const QString &owner)
+{
+    return refreshParameterInfo(parameterId, QJSValue(), QJSValue(), owner);
+}
+
+quint64 ParameterStore::refreshParameterInfo(int parameterId,
+                                             const QJSValue &onSuccess,
+                                             const QJSValue &onFailure,
+                                             const QString &owner)
+{
+    if (!m_connectionSession || parameterId < 0 || parameterId > 0xFFFF) {
+        const QString message = QStringLiteral("Invalid parameter info refresh request.");
+        emit errorOccurred(message);
+        invokeFailureCallback(onFailure, message);
+        return 0;
+    }
+
+    Entry &entry = ensureEntry(static_cast<quint16>(parameterId));
+    if (entry.busy) {
+        const QString message = QStringLiteral("Parameter %1 is busy.").arg(parameterId);
+        entry.lastError = message;
+        notifyEntryChanged(entry.id);
+        invokeFailureCallback(onFailure, message);
+        return 0;
+    }
+
+    setEntryBusy(&entry, true, QStringLiteral("reading"), owner);
+    notifyEntryChanged(entry.id);
+
+    const quint16 id = static_cast<quint16>(parameterId);
+    const quint64 requestId = m_connectionSession->requestParameterInfo(
+        id,
+        [this, onSuccess](const QVariantMap &frame) {
+            applyParameterInfo(frame);
+            invokeSuccessCallback(onSuccess, frame);
+        },
+        [this, id, onFailure](const QString &reason) {
+            Entry &entry = ensureEntry(id);
+            entry.lastError = reason;
+            setEntryBusy(&entry, false);
+            ++entry.revision;
+            notifyEntryChanged(id);
+            invokeFailureCallback(onFailure, reason);
+        });
+    entry.activeRequestId = requestId;
+    notifyEntryChanged(entry.id);
+    return requestId;
+}
+
+quint64 ParameterStore::writeParameterRaw(int parameterId, const QString &valueHex, const QString &owner)
+{
+    if (!m_connectionSession || parameterId < 0 || parameterId > 0xFFFF) {
+        emit errorOccurred(QStringLiteral("Invalid parameter write request."));
+        return 0;
+    }
+
+    bool ok = false;
+    const QByteArray value = bytesFromHex(valueHex, &ok);
+    if (!ok) {
+        emit errorOccurred(QStringLiteral("Parameter value hex is invalid."));
+        return 0;
+    }
+
+    Entry &entry = ensureEntry(static_cast<quint16>(parameterId));
+    if (entry.busy) {
+        const QString message = QStringLiteral("Parameter %1 is busy.").arg(parameterId);
+        entry.lastError = message;
+        notifyEntryChanged(entry.id);
+        emit parameterWriteFailed(parameterId, message);
+        emit errorOccurred(message);
+        return 0;
+    }
+
+    entry.draftBytes = value;
+    entry.dirty = true;
+    entry.lastError.clear();
+    setEntryBusy(&entry, true, QStringLiteral("writing"), owner);
+    notifyEntryChanged(entry.id);
+
+    const quint16 id = static_cast<quint16>(parameterId);
+    const quint64 requestId = m_connectionSession->writeParameterRaw(
+        id,
+        valueHex,
+        [this, id, value](const QVariantMap &response) {
+            Entry &entry = ensureEntry(id);
+            const int ackCode = response.value(QStringLiteral("ackCode"), 0).toInt();
+            if (ackCode != 0) {
+                const QString message = response.value(QStringLiteral("ackMessage")).toString();
+                entry.lastError = message;
+                entry.dirty = true;
+                setEntryBusy(&entry, false);
+                ++entry.revision;
+                notifyEntryChanged(id);
+                emit parameterWriteFailed(id, message);
+                return;
+            }
+
+            entry.valueBytes = value;
+            entry.draftBytes.clear();
+            entry.hasValue = true;
+            entry.dirty = false;
+            entry.lastError.clear();
+            setEntryBusy(&entry, false);
+            ++entry.revision;
+            notifyEntryChanged(id);
+            emit parameterWriteSucceeded(id);
+        },
+        [this, id](const QString &reason) {
+            Entry &entry = ensureEntry(id);
+            entry.lastError = reason;
+            entry.dirty = true;
+            setEntryBusy(&entry, false);
+            ++entry.revision;
+            notifyEntryChanged(id);
+            emit parameterWriteFailed(id, reason);
+        });
+    entry.activeRequestId = requestId;
+    notifyEntryChanged(entry.id);
+    return requestId;
+}
+
+void ParameterStore::clearError(int parameterId)
+{
+    if (parameterId < 0 || parameterId > 0xFFFF) {
+        return;
+    }
+
+    Entry &entry = ensureEntry(static_cast<quint16>(parameterId));
+    if (entry.lastError.isEmpty()) {
+        return;
+    }
+    entry.lastError.clear();
+    notifyEntryChanged(entry.id);
+}
+
+ParameterStore::Entry &ParameterStore::ensureEntry(quint16 parameterId)
+{
+    const auto existing = m_rowById.constFind(parameterId);
+    if (existing != m_rowById.constEnd()) {
+        return m_entries[*existing];
+    }
+
+    const int row = m_entries.size();
+    beginInsertRows(QModelIndex(), row, row);
+    Entry entry;
+    entry.id = parameterId;
+    m_entries.append(entry);
+    m_rowById.insert(parameterId, row);
+    endInsertRows();
+    return m_entries[row];
+}
+
+const ParameterStore::Entry *ParameterStore::entryFor(quint16 parameterId) const
+{
+    const auto row = m_rowById.constFind(parameterId);
+    return row == m_rowById.constEnd() ? nullptr : &m_entries.at(*row);
+}
+
+int ParameterStore::rowFor(quint16 parameterId) const
+{
+    return m_rowById.value(parameterId, -1);
+}
+
+QModelIndex ParameterStore::indexFor(quint16 parameterId) const
+{
+    const int row = rowFor(parameterId);
+    return row < 0 ? QModelIndex() : index(row, 0);
+}
+
+QVariantMap ParameterStore::entryToMap(const Entry &entry) const
+{
+    QVariantMap map;
+    map.insert(QStringLiteral("parameterId"), entry.id);
+    map.insert(QStringLiteral("name"), entry.name);
+    map.insert(QStringLiteral("type"), entry.type);
+    map.insert(QStringLiteral("typeName"), typeName(entry.type));
+    map.insert(QStringLiteral("value"), decodeValue(entry.dirty ? entry.draftBytes : entry.valueBytes, entry.type));
+    map.insert(QStringLiteral("valueHex"), QString::fromLatin1((entry.dirty ? entry.draftBytes : entry.valueBytes).toHex(' ').toUpper()));
+    map.insert(QStringLiteral("hasDefinition"), entry.hasDefinition);
+    map.insert(QStringLiteral("hasValue"), entry.hasValue);
+    map.insert(QStringLiteral("dirty"), entry.dirty);
+    map.insert(QStringLiteral("busy"), entry.busy);
+    map.insert(QStringLiteral("editable"), !entry.busy);
+    map.insert(QStringLiteral("busyReason"), entry.busyReason);
+    map.insert(QStringLiteral("owner"), entry.owner);
+    map.insert(QStringLiteral("lastError"), entry.lastError);
+    map.insert(QStringLiteral("revision"), QVariant::fromValue(entry.revision));
+    map.insert(QStringLiteral("description"), entry.description);
+    return map;
+}
+
+void ParameterStore::notifyEntryChanged(quint16 parameterId)
+{
+    const QModelIndex modelIndex = indexFor(parameterId);
+    if (!modelIndex.isValid()) {
+        return;
+    }
+
+    emit dataChanged(modelIndex, modelIndex);
+    emit parameterChanged(parameterId);
+}
+
+void ParameterStore::setEntryBusy(Entry *entry,
+                                  bool busy,
+                                  const QString &reason,
+                                  const QString &owner,
+                                  quint64 requestId)
+{
+    if (!entry) {
+        return;
+    }
+
+    const bool changed = entry->busy != busy;
+    entry->busy = busy;
+    entry->busyReason = busy ? reason : QString();
+    entry->owner = busy ? owner : QString();
+    entry->activeRequestId = busy ? requestId : 0;
+    if (changed) {
+        emit parameterBusyChanged(entry->id, busy);
+    }
+}
+
+void ParameterStore::applyParameterInfo(const QVariantMap &frame)
+{
+    const int idValue = frame.value(QStringLiteral("parameterId"), -1).toInt();
+    if (idValue < 0 || idValue > 0xFFFF) {
+        return;
+    }
+
+    const quint16 id = static_cast<quint16>(idValue);
+    Entry &entry = ensureEntry(id);
+    entry.type = frame.value(QStringLiteral("parameterType"), entry.type).toInt();
+    entry.name = frame.value(QStringLiteral("parameterName"), entry.name).toString();
+    entry.description = frame.value(QStringLiteral("parameterInfo"), entry.description).toString();
+    entry.hasDefinition = true;
+    entry.lastError.clear();
+    setEntryBusy(&entry, false);
+    ++entry.revision;
+    notifyEntryChanged(id);
+}
+
+void ParameterStore::applyParameterValue(const QVariantMap &frame)
+{
+    const int idValue = frame.value(QStringLiteral("parameterId"), -1).toInt();
+    if (idValue < 0 || idValue > 0xFFFF) {
+        return;
+    }
+
+    const quint16 id = static_cast<quint16>(idValue);
+    Entry &entry = ensureEntry(id);
+    bool ok = false;
+    const QByteArray bytes = bytesFromHex(frame.value(QStringLiteral("parameterValueHex")).toString(), &ok);
+    if (!ok) {
+        return;
+    }
+
+    entry.valueBytes = bytes;
+    entry.draftBytes.clear();
+    entry.hasValue = true;
+    entry.dirty = false;
+    entry.lastError.clear();
+    setEntryBusy(&entry, false);
+    ++entry.revision;
+    notifyEntryChanged(id);
+}
+
+void ParameterStore::invokeSuccessCallback(const QJSValue &callback, const QVariantMap &frame)
+{
+    if (!callback.isCallable()) {
+        return;
+    }
+
+    QJSEngine *engine = qjsEngine(this);
+    if (!engine) {
+        return;
+    }
+
+    QJSValue callable = callback;
+    callable.call({ engine->toScriptValue(frame) });
+}
+
+void ParameterStore::invokeFailureCallback(const QJSValue &callback, const QString &reason)
+{
+    if (!callback.isCallable()) {
+        return;
+    }
+
+    QJSEngine *engine = qjsEngine(this);
+    if (!engine) {
+        return;
+    }
+
+    QVariantMap payload;
+    payload.insert(QStringLiteral("reason"), reason);
+
+    QJSValue callable = callback;
+    callable.call({ engine->toScriptValue(payload) });
+}
+
+QVariant ParameterStore::decodeValue(const QByteArray &bytes, int type)
+{
+    if (bytes.isEmpty()) {
+        return {};
+    }
+
+    auto readUnsigned = [&bytes](int count) -> quint64 {
+        quint64 value = 0;
+        for (int i = 0; i < count && i < bytes.size(); ++i) {
+            value |= static_cast<quint64>(static_cast<quint8>(bytes.at(i))) << (8 * i);
+        }
+        return value;
+    };
+
+    switch (type) {
+    case 0:
+        return static_cast<quint8>(readUnsigned(1));
+    case 1:
+        return static_cast<qint8>(readUnsigned(1));
+    case 2:
+        return static_cast<quint16>(readUnsigned(2));
+    case 3:
+        return static_cast<qint16>(readUnsigned(2));
+    case 4:
+        return static_cast<quint32>(readUnsigned(4));
+    case 5:
+        return static_cast<qint32>(readUnsigned(4));
+    case 6:
+        return QString::number(readUnsigned(8));
+    case 7:
+        return QString::number(static_cast<qint64>(readUnsigned(8)));
+    case 8: {
+        const quint32 raw = static_cast<quint32>(readUnsigned(4));
+        float value = 0.0f;
+        std::memcpy(&value, &raw, sizeof(float));
+        return value;
+    }
+    case 9: {
+        const quint64 raw = readUnsigned(8);
+        double value = 0.0;
+        std::memcpy(&value, &raw, sizeof(double));
+        return value;
+    }
+    case 10:
+        return QString::fromUtf8(bytes);
+    default:
+        return QString::fromLatin1(bytes.toHex(' ').toUpper());
+    }
+}
+
+QString ParameterStore::typeName(int type)
+{
+    switch (type) {
+    case 0: return QStringLiteral("UInt8");
+    case 1: return QStringLiteral("Int8");
+    case 2: return QStringLiteral("UInt16");
+    case 3: return QStringLiteral("Int16");
+    case 4: return QStringLiteral("UInt32");
+    case 5: return QStringLiteral("Int32");
+    case 6: return QStringLiteral("UInt64");
+    case 7: return QStringLiteral("Int64");
+    case 8: return QStringLiteral("Float");
+    case 9: return QStringLiteral("Double");
+    case 10: return QStringLiteral("String");
+    default: return QStringLiteral("Unknown");
+    }
+}
+
+QByteArray ParameterStore::bytesFromHex(const QString &hex, bool *ok)
+{
+    QString normalized = hex;
+    normalized.remove(QRegularExpression(QStringLiteral("\\s+")));
+
+    static const QRegularExpression validHex(QStringLiteral("^[0-9a-fA-F]*$"));
+    const bool valid = normalized.size() % 2 == 0 && validHex.match(normalized).hasMatch();
+    if (ok) {
+        *ok = valid;
+    }
+    return valid ? QByteArray::fromHex(normalized.toLatin1()) : QByteArray();
+}

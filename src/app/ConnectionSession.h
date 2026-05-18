@@ -1,6 +1,7 @@
 #pragma once
 
 #include "AnotcRequestManager.h"
+#include "ParameterStore.h"
 
 #include "../connection/ConnectionConfig.h"
 #include "../connection/ITransport.h"
@@ -14,7 +15,9 @@
 #include <QThread>
 #include <QStringList>
 #include <QVariantList>
+#include <QVariantMap>
 
+#include <functional>
 #include <memory>
 
 class ConnectionSession : public QObject
@@ -24,8 +27,12 @@ class ConnectionSession : public QObject
     Q_PROPERTY(QString state READ state NOTIFY stateChanged)
     Q_PROPERTY(QString lastError READ lastError NOTIFY errorOccurred)
     Q_PROPERTY(bool rawByteForwardingEnabled READ rawByteForwardingEnabled WRITE setRawByteForwardingEnabled NOTIFY rawByteForwardingEnabledChanged)
+    Q_PROPERTY(ParameterStore *parameterStore READ parameterStore CONSTANT)
 
 public:
+    using RequestSuccessHandler = std::function<void(const QVariantMap &response)>;
+    using RequestFailureHandler = std::function<void(const QString &reason)>;
+
     explicit ConnectionSession(QObject *parent = nullptr);
     ~ConnectionSession() override;
 
@@ -34,6 +41,7 @@ public:
     QString lastError() const;
     bool rawByteForwardingEnabled() const;
     void setRawByteForwardingEnabled(bool enabled);
+    ParameterStore *parameterStore();
 
     Q_INVOKABLE QStringList availableSerialPorts() const;
     Q_INVOKABLE bool openSerial(const QString &portName,
@@ -74,6 +82,19 @@ public:
                                                  const QJSValue &onSuccess = QJSValue(),
                                                  const QJSValue &onFailure = QJSValue());
 
+    quint64 requestParameterCount(RequestSuccessHandler onSuccess,
+                                  RequestFailureHandler onFailure = {});
+    quint64 requestParameterValue(int parameterId,
+                                  RequestSuccessHandler onSuccess,
+                                  RequestFailureHandler onFailure = {});
+    quint64 requestParameterInfo(int parameterId,
+                                 RequestSuccessHandler onSuccess,
+                                 RequestFailureHandler onFailure = {});
+    quint64 writeParameterRaw(int parameterId,
+                              const QString &valueHex,
+                              RequestSuccessHandler onSuccess,
+                              RequestFailureHandler onFailure = {});
+
 signals:
     void isOpenChanged();
     void stateChanged();
@@ -102,6 +123,12 @@ private:
         QJSValue onFailure;
     };
 
+    struct CppCallbacks
+    {
+        RequestSuccessHandler onSuccess;
+        RequestFailureHandler onFailure;
+    };
+
     void setTransport(ITransport *transport);
     void setProtocol(std::unique_ptr<IProtocolSession> protocol);
     void resetConnectionObjects();
@@ -112,6 +139,9 @@ private:
     quint64 submitRequest(const AnotcRequest &request,
                           const QJSValue &onSuccess,
                           const QJSValue &onFailure);
+    quint64 submitRequest(const AnotcRequest &request,
+                          RequestSuccessHandler onSuccess,
+                          RequestFailureHandler onFailure);
     void storeRequestCallbacks(quint64 requestId,
                                const QJSValue &onSuccess,
                                const QJSValue &onFailure);
@@ -126,7 +156,15 @@ private:
                                quint64 id,
                                const QString &name,
                                const _un_anotc_v8_frame &response);
+    void invokeSuccessCallback(const RequestSuccessHandler &callback,
+                               quint64 id,
+                               const QString &name,
+                               const _un_anotc_v8_frame &response);
     void invokeFailureCallback(const QJSValue &callback,
+                               quint64 id,
+                               const QString &name,
+                               const QString &reason);
+    void invokeFailureCallback(const RequestFailureHandler &callback,
                                quint64 id,
                                const QString &name,
                                const QString &reason);
@@ -140,7 +178,9 @@ private:
     QPointer<ITransport> m_transport;
     std::unique_ptr<IProtocolSession> m_protocol;
     AnotcRequestManager m_requestManager;
+    ParameterStore m_parameterStore;
     QHash<quint64, JsCallbacks> m_requestCallbacks;
+    QHash<quint64, CppCallbacks> m_cppRequestCallbacks;
     QHash<quint64, JsCallbacks> m_sequenceCallbacks;
     bool m_isOpen = false;
     bool m_rawByteForwardingEnabled = false;

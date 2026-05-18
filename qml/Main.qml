@@ -272,6 +272,7 @@ ApplicationWindow {
 
                 model: ListModel {
                     ListElement { name: "Home";    page: "pages/HomePage.qml" }
+                    ListElement { name: "Parameters";    page: "pages/ParameterPage.qml" }
                     ListElement { name: "Data Frame";    page: "pages/DataFrameTablePage.qml" }
                     ListElement { name: "Data Analysis";    page: "pages/DataChartPage.qml" }
                     ListElement { name: "Qt Graphs";    page: "pages/DataChartGraphsPage.qml" }
@@ -323,7 +324,7 @@ ApplicationWindow {
             target: dataTableModel
 
             function onAddSelectedData(functionId, parameterIndex) {
-                menuList.currentIndex = 2
+                menuList.currentIndex = 3
                 pageLoader.source = Qt.resolvedUrl("pages/DataChartPage.qml")
             }
         }
