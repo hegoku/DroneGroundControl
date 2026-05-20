@@ -64,10 +64,8 @@ public:
     Q_INVOKABLE quint64 requestParameterInfo(int parameterId,
                                              const QJSValue &onSuccess = QJSValue(),
                                              const QJSValue &onFailure = QJSValue());
-    Q_INVOKABLE quint64 writeParameterRaw(int parameterId,
-                                          const QString &valueHex,
-                                          const QJSValue &onSuccess = QJSValue(),
-                                          const QJSValue &onFailure = QJSValue());
+    Q_INVOKABLE quint64 saveParameters(const QJSValue &onSuccess = QJSValue(),
+                                       const QJSValue &onFailure = QJSValue());
     Q_INVOKABLE quint64 sendReliableParameterCommand(int command,
                                                      int value = 0,
                                                      const QJSValue &onSuccess = QJSValue(),
@@ -91,7 +89,7 @@ public:
                                  RequestSuccessHandler onSuccess,
                                  RequestFailureHandler onFailure = {});
     quint64 writeParameterRaw(int parameterId,
-                              const QString &valueHex,
+                              const QByteArray &value,
                               RequestSuccessHandler onSuccess,
                               RequestFailureHandler onFailure = {});
 

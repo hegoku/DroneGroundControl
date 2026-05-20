@@ -6,6 +6,7 @@
 #include <QRegularExpression>
 
 #include <cstring>
+#include <limits>
 
 ParameterStore::ParameterStore(QObject *parent)
     : QAbstractListModel(parent)
@@ -114,6 +115,69 @@ bool ParameterStore::isEditable(int parameterId) const
     return !isBusy(parameterId);
 }
 
+int ParameterStore::dirtyCount() const
+{
+    int count = 0;
+    for (const Entry &entry : m_entries) {
+        if (entry.dirty) {
+            ++count;
+        }
+    }
+    return count;
+}
+
+QVariantList ParameterStore::dirtyParameterIds() const
+{
+    QVariantList ids;
+    for (const Entry &entry : m_entries) {
+        if (entry.dirty) {
+            ids.append(entry.id);
+        }
+    }
+    return ids;
+}
+
+bool ParameterStore::setParameterValueText(int parameterId, const QString &text, const QString &owner)
+{
+    if (parameterId < 0 || parameterId > 0xFFFF) {
+        emit errorOccurred(QStringLiteral("Parameter id is out of range."));
+        return false;
+    }
+
+    Entry &entry = ensureEntry(static_cast<quint16>(parameterId));
+    if (entry.busy) {
+        entry.lastError = QStringLiteral("Parameter %1 is busy.").arg(parameterId);
+        notifyEntryChanged(entry.id);
+        return false;
+    }
+    if (!entry.hasDefinition) {
+        entry.lastError = QStringLiteral("Parameter %1 has no definition.").arg(parameterId);
+        notifyEntryChanged(entry.id);
+        return false;
+    }
+
+    QByteArray bytes;
+    QString error;
+    if (!encodeValueText(text, entry.type, &bytes, &error)) {
+        entry.lastError = error;
+        ++entry.revision;
+        notifyEntryChanged(entry.id);
+        return false;
+    }
+
+    const bool wasDirty = entry.dirty;
+    entry.draftBytes = bytes;
+    entry.dirty = entry.valueBytes != bytes || !entry.hasValue;
+    entry.lastError.clear();
+    entry.owner = entry.dirty ? owner : QString();
+    ++entry.revision;
+    notifyEntryChanged(entry.id);
+    if (wasDirty != entry.dirty) {
+        emit dirtyCountChanged();
+    }
+    return true;
+}
+
 quint64 ParameterStore::refreshParameterValue(int parameterId, const QString &owner)
 {
     return refreshParameterValue(parameterId, QJSValue(), QJSValue(), owner);
@@ -212,42 +276,67 @@ quint64 ParameterStore::refreshParameterInfo(int parameterId,
     return requestId;
 }
 
-quint64 ParameterStore::writeParameterRaw(int parameterId, const QString &valueHex, const QString &owner)
+quint64 ParameterStore::writeParameter(int parameterId,
+                                       const QJSValue &onSuccess,
+                                       const QJSValue &onFailure,
+                                       const QString &owner)
 {
-    if (!m_connectionSession || parameterId < 0 || parameterId > 0xFFFF) {
-        emit errorOccurred(QStringLiteral("Invalid parameter write request."));
-        return 0;
-    }
-
-    bool ok = false;
-    const QByteArray value = bytesFromHex(valueHex, &ok);
-    if (!ok) {
-        emit errorOccurred(QStringLiteral("Parameter value hex is invalid."));
+    if (parameterId < 0 || parameterId > 0xFFFF) {
+        const QString message = QStringLiteral("Invalid parameter write request.");
+        emit errorOccurred(message);
+        invokeFailureCallback(onFailure, message);
         return 0;
     }
 
     Entry &entry = ensureEntry(static_cast<quint16>(parameterId));
+    const QByteArray value = entry.dirty ? entry.draftBytes : entry.valueBytes;
+    if (value.isEmpty() && entry.type != 10) {
+        const QString message = QStringLiteral("Parameter %1 has no value to write.").arg(parameterId);
+        entry.lastError = message;
+        notifyEntryChanged(entry.id);
+        invokeFailureCallback(onFailure, message);
+        return 0;
+    }
+
+    return writeParameterBytes(static_cast<quint16>(parameterId), value, onSuccess, onFailure, owner);
+}
+
+quint64 ParameterStore::writeParameterBytes(quint16 parameterId,
+                                            const QByteArray &value,
+                                            const QJSValue &onSuccess,
+                                            const QJSValue &onFailure,
+                                            const QString &owner)
+{
+    if (!m_connectionSession) {
+        const QString message = QStringLiteral("Invalid parameter write request.");
+        emit errorOccurred(message);
+        invokeFailureCallback(onFailure, message);
+        return 0;
+    }
+
+    Entry &entry = ensureEntry(parameterId);
     if (entry.busy) {
         const QString message = QStringLiteral("Parameter %1 is busy.").arg(parameterId);
         entry.lastError = message;
         notifyEntryChanged(entry.id);
         emit parameterWriteFailed(parameterId, message);
         emit errorOccurred(message);
+        invokeFailureCallback(onFailure, message);
         return 0;
     }
 
+    const bool wasDirty = entry.dirty;
     entry.draftBytes = value;
     entry.dirty = true;
     entry.lastError.clear();
     setEntryBusy(&entry, true, QStringLiteral("writing"), owner);
     notifyEntryChanged(entry.id);
 
-    const quint16 id = static_cast<quint16>(parameterId);
     const quint64 requestId = m_connectionSession->writeParameterRaw(
-        id,
-        valueHex,
-        [this, id, value](const QVariantMap &response) {
-            Entry &entry = ensureEntry(id);
+        parameterId,
+        value,
+        [this, parameterId, value, onSuccess, onFailure](const QVariantMap &response) {
+            Entry &entry = ensureEntry(parameterId);
             const int ackCode = response.value(QStringLiteral("ackCode"), 0).toInt();
             if (ackCode != 0) {
                 const QString message = response.value(QStringLiteral("ackMessage")).toString();
@@ -255,8 +344,9 @@ quint64 ParameterStore::writeParameterRaw(int parameterId, const QString &valueH
                 entry.dirty = true;
                 setEntryBusy(&entry, false);
                 ++entry.revision;
-                notifyEntryChanged(id);
-                emit parameterWriteFailed(id, message);
+                notifyEntryChanged(parameterId);
+                emit parameterWriteFailed(parameterId, message);
+                invokeFailureCallback(onFailure, message);
                 return;
             }
 
@@ -267,20 +357,26 @@ quint64 ParameterStore::writeParameterRaw(int parameterId, const QString &valueH
             entry.lastError.clear();
             setEntryBusy(&entry, false);
             ++entry.revision;
-            notifyEntryChanged(id);
-            emit parameterWriteSucceeded(id);
+            notifyEntryChanged(parameterId);
+            emit dirtyCountChanged();
+            emit parameterWriteSucceeded(parameterId);
+            invokeSuccessCallback(onSuccess, response);
         },
-        [this, id](const QString &reason) {
-            Entry &entry = ensureEntry(id);
+        [this, parameterId, onFailure](const QString &reason) {
+            Entry &entry = ensureEntry(parameterId);
             entry.lastError = reason;
             entry.dirty = true;
             setEntryBusy(&entry, false);
             ++entry.revision;
-            notifyEntryChanged(id);
-            emit parameterWriteFailed(id, reason);
+            notifyEntryChanged(parameterId);
+            emit parameterWriteFailed(parameterId, reason);
+            invokeFailureCallback(onFailure, reason);
         });
     entry.activeRequestId = requestId;
     notifyEntryChanged(entry.id);
+    if (!wasDirty) {
+        emit dirtyCountChanged();
+    }
     return requestId;
 }
 
@@ -419,6 +515,7 @@ void ParameterStore::applyParameterValue(const QVariantMap &frame)
         return;
     }
 
+    const bool wasDirty = entry.dirty;
     entry.valueBytes = bytes;
     entry.draftBytes.clear();
     entry.hasValue = true;
@@ -427,6 +524,9 @@ void ParameterStore::applyParameterValue(const QVariantMap &frame)
     setEntryBusy(&entry, false);
     ++entry.revision;
     notifyEntryChanged(id);
+    if (wasDirty) {
+        emit dirtyCountChanged();
+    }
 }
 
 void ParameterStore::invokeSuccessCallback(const QJSValue &callback, const QVariantMap &frame)
@@ -436,6 +536,9 @@ void ParameterStore::invokeSuccessCallback(const QJSValue &callback, const QVari
     }
 
     QJSEngine *engine = qjsEngine(this);
+    if (!engine && m_connectionSession) {
+        engine = qjsEngine(m_connectionSession);
+    }
     if (!engine) {
         return;
     }
@@ -451,6 +554,9 @@ void ParameterStore::invokeFailureCallback(const QJSValue &callback, const QStri
     }
 
     QJSEngine *engine = qjsEngine(this);
+    if (!engine && m_connectionSession) {
+        engine = qjsEngine(m_connectionSession);
+    }
     if (!engine) {
         return;
     }
@@ -512,6 +618,116 @@ QVariant ParameterStore::decodeValue(const QByteArray &bytes, int type)
     }
 }
 
+bool ParameterStore::encodeValueText(const QString &text, int type, QByteArray *bytes, QString *error)
+{
+    if (!bytes) {
+        return false;
+    }
+
+    auto fail = [error](const QString &message) {
+        if (error) {
+            *error = message;
+        }
+        return false;
+    };
+
+    bytes->clear();
+    const QString trimmed = text.trimmed();
+    bool ok = false;
+
+    switch (type) {
+    case 0: {
+        const quint64 value = trimmed.toULongLong(&ok);
+        if (!ok || value > std::numeric_limits<quint8>::max()) {
+            return fail(QStringLiteral("Value must be UInt8."));
+        }
+        appendUnsigned(bytes, value, 1);
+        return true;
+    }
+    case 1: {
+        const qint64 value = trimmed.toLongLong(&ok);
+        if (!ok || value < std::numeric_limits<qint8>::min() || value > std::numeric_limits<qint8>::max()) {
+            return fail(QStringLiteral("Value must be Int8."));
+        }
+        appendSigned(bytes, value, 1);
+        return true;
+    }
+    case 2: {
+        const quint64 value = trimmed.toULongLong(&ok);
+        if (!ok || value > std::numeric_limits<quint16>::max()) {
+            return fail(QStringLiteral("Value must be UInt16."));
+        }
+        appendUnsigned(bytes, value, 2);
+        return true;
+    }
+    case 3: {
+        const qint64 value = trimmed.toLongLong(&ok);
+        if (!ok || value < std::numeric_limits<qint16>::min() || value > std::numeric_limits<qint16>::max()) {
+            return fail(QStringLiteral("Value must be Int16."));
+        }
+        appendSigned(bytes, value, 2);
+        return true;
+    }
+    case 4: {
+        const quint64 value = trimmed.toULongLong(&ok);
+        if (!ok || value > std::numeric_limits<quint32>::max()) {
+            return fail(QStringLiteral("Value must be UInt32."));
+        }
+        appendUnsigned(bytes, value, 4);
+        return true;
+    }
+    case 5: {
+        const qint64 value = trimmed.toLongLong(&ok);
+        if (!ok || value < std::numeric_limits<qint32>::min() || value > std::numeric_limits<qint32>::max()) {
+            return fail(QStringLiteral("Value must be Int32."));
+        }
+        appendSigned(bytes, value, 4);
+        return true;
+    }
+    case 6: {
+        const quint64 value = trimmed.toULongLong(&ok);
+        if (!ok) {
+            return fail(QStringLiteral("Value must be UInt64."));
+        }
+        appendUnsigned(bytes, value, 8);
+        return true;
+    }
+    case 7: {
+        const qint64 value = trimmed.toLongLong(&ok);
+        if (!ok) {
+            return fail(QStringLiteral("Value must be Int64."));
+        }
+        appendSigned(bytes, value, 8);
+        return true;
+    }
+    case 8: {
+        const float value = trimmed.toFloat(&ok);
+        if (!ok) {
+            return fail(QStringLiteral("Value must be Float."));
+        }
+        quint32 raw = 0;
+        std::memcpy(&raw, &value, sizeof(float));
+        appendUnsigned(bytes, raw, 4);
+        return true;
+    }
+    case 9: {
+        const double value = trimmed.toDouble(&ok);
+        if (!ok) {
+            return fail(QStringLiteral("Value must be Double."));
+        }
+        quint64 raw = 0;
+        std::memcpy(&raw, &value, sizeof(double));
+        appendUnsigned(bytes, raw, 8);
+        return true;
+    }
+    case 10:
+        bytes->append(text.toUtf8());
+        return true;
+    default:
+        return fail(QStringLiteral("Parameter type is unknown."));
+    }
+}
+
 QString ParameterStore::typeName(int type)
 {
     switch (type) {
@@ -541,4 +757,16 @@ QByteArray ParameterStore::bytesFromHex(const QString &hex, bool *ok)
         *ok = valid;
     }
     return valid ? QByteArray::fromHex(normalized.toLatin1()) : QByteArray();
+}
+
+void ParameterStore::appendUnsigned(QByteArray *bytes, quint64 value, int byteCount)
+{
+    for (int i = 0; i < byteCount; ++i) {
+        bytes->append(static_cast<char>((value >> (8 * i)) & 0xFF));
+    }
+}
+
+void ParameterStore::appendSigned(QByteArray *bytes, qint64 value, int byteCount)
+{
+    appendUnsigned(bytes, static_cast<quint64>(value), byteCount);
 }

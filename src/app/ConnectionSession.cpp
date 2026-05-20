@@ -446,28 +446,12 @@ quint64 ConnectionSession::requestParameterInfo(int parameterId,
                          onFailure);
 }
 
-quint64 ConnectionSession::writeParameterRaw(int parameterId,
-                                             const QString &valueHex,
-                                             const QJSValue &onSuccess,
-                                             const QJSValue &onFailure)
+quint64 ConnectionSession::saveParameters(const QJSValue &onSuccess, const QJSValue &onFailure)
 {
-    if (!isU16Value(parameterId)) {
-        setLastError(QStringLiteral("Parameter id is out of range."));
-        invokeFailureCallback(onFailure, 0, QStringLiteral("Write parameter"), lastError());
-        return 0;
-    }
-
-    bool ok = false;
-    const QByteArray value = bytesFromHex(valueHex, &ok);
-    if (!ok) {
-        setLastError(QStringLiteral("Parameter value hex is invalid."));
-        invokeFailureCallback(onFailure, 0, QStringLiteral("Write parameter"), lastError());
-        return 0;
-    }
-
-    return submitRequest(AnotcRequestManager::makeWriteParameterRequest(static_cast<quint16>(parameterId), value),
-                         onSuccess,
-                         onFailure);
+    return sendReliableParameterCommand(ANOTC_CONFIG_FRAME_CMD_0X10,
+                                        ANOTC_CONFIG_FRAME_VAL_SAVE_PARAM,
+                                        onSuccess,
+                                        onFailure);
 }
 
 quint64 ConnectionSession::requestParameterCount(RequestSuccessHandler onSuccess,
@@ -513,22 +497,12 @@ quint64 ConnectionSession::requestParameterInfo(int parameterId,
 }
 
 quint64 ConnectionSession::writeParameterRaw(int parameterId,
-                                             const QString &valueHex,
+                                             const QByteArray &value,
                                              RequestSuccessHandler onSuccess,
                                              RequestFailureHandler onFailure)
 {
     if (!isU16Value(parameterId)) {
         setLastError(QStringLiteral("Parameter id is out of range."));
-        if (onFailure) {
-            onFailure(lastError());
-        }
-        return 0;
-    }
-
-    bool ok = false;
-    const QByteArray value = bytesFromHex(valueHex, &ok);
-    if (!ok) {
-        setLastError(QStringLiteral("Parameter value hex is invalid."));
         if (onFailure) {
             onFailure(lastError());
         }

@@ -13,6 +13,7 @@ class ConnectionSession;
 class ParameterStore : public QAbstractListModel
 {
     Q_OBJECT
+    Q_PROPERTY(int dirtyCount READ dirtyCount NOTIFY dirtyCountChanged)
 
 public:
     enum Role {
@@ -46,6 +47,11 @@ public:
     Q_INVOKABLE QVariantMap parameter(int parameterId) const;
     Q_INVOKABLE bool isBusy(int parameterId) const;
     Q_INVOKABLE bool isEditable(int parameterId) const;
+    Q_INVOKABLE int dirtyCount() const;
+    Q_INVOKABLE QVariantList dirtyParameterIds() const;
+    Q_INVOKABLE bool setParameterValueText(int parameterId,
+                                           const QString &text,
+                                           const QString &owner = QStringLiteral("ParameterStore"));
     Q_INVOKABLE quint64 refreshParameterValue(int parameterId,
                                               const QString &owner = QStringLiteral("ParameterStore"));
     Q_INVOKABLE quint64 refreshParameterValue(int parameterId,
@@ -58,9 +64,10 @@ public:
                                              const QJSValue &onSuccess,
                                              const QJSValue &onFailure,
                                              const QString &owner = QStringLiteral("ParameterStore"));
-    Q_INVOKABLE quint64 writeParameterRaw(int parameterId,
-                                          const QString &valueHex,
-                                          const QString &owner = QStringLiteral("ParameterStore"));
+    Q_INVOKABLE quint64 writeParameter(int parameterId,
+                                       const QJSValue &onSuccess,
+                                       const QJSValue &onFailure,
+                                       const QString &owner = QStringLiteral("ParameterStore"));
     Q_INVOKABLE void clearError(int parameterId);
 
 signals:
@@ -68,6 +75,7 @@ signals:
     void parameterBusyChanged(int parameterId, bool busy);
     void parameterWriteSucceeded(int parameterId);
     void parameterWriteFailed(int parameterId, QString reason);
+    void dirtyCountChanged();
     void errorOccurred(QString message);
 
 private:
@@ -105,9 +113,17 @@ private:
     void applyParameterValue(const QVariantMap &frame);
     void invokeSuccessCallback(const QJSValue &callback, const QVariantMap &frame);
     void invokeFailureCallback(const QJSValue &callback, const QString &reason);
+    quint64 writeParameterBytes(quint16 parameterId,
+                                const QByteArray &value,
+                                const QJSValue &onSuccess,
+                                const QJSValue &onFailure,
+                                const QString &owner);
     static QVariant decodeValue(const QByteArray &bytes, int type);
+    static bool encodeValueText(const QString &text, int type, QByteArray *bytes, QString *error);
     static QString typeName(int type);
     static QByteArray bytesFromHex(const QString &hex, bool *ok);
+    static void appendUnsigned(QByteArray *bytes, quint64 value, int byteCount);
+    static void appendSigned(QByteArray *bytes, qint64 value, int byteCount);
 
     ConnectionSession *m_connectionSession = nullptr;
     QVector<Entry> m_entries;

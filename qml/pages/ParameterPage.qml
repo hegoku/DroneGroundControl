@@ -4,10 +4,11 @@ import QtQuick.Controls
 Rectangle {
     id: root
     anchors.fill: parent
-    color: "#f4f6f8"
+    color: "#fbfcfd"
 
     property var store: droneSession.parameterStore
     property bool reading: false
+    property bool saving: false
     property int targetCount: 0
     property int completedCount: 0
     property int currentParameterId: -1
@@ -97,6 +98,16 @@ Rectangle {
         return String(value)
     }
 
+    function statusColor() {
+        if (statusMessage.indexOf("failed") >= 0 || statusMessage.indexOf("failed:") >= 0) {
+            return "#ef4444"
+        }
+        if (reading || saving) {
+            return "#4c8bf5"
+        }
+        return "#61cf6f"
+    }
+
     function failReadAll(message) {
         reading = false
         currentParameterId = -1
@@ -127,8 +138,78 @@ Rectangle {
         }
     }
 
+    function finishSave() {
+        saving = false
+        currentParameterId = -1
+        if (failedCount > 0) {
+            statusMessage = "Saved " + (targetCount - failedCount) + " of " + targetCount + " changed parameters"
+        } else {
+            statusMessage = "Saved " + targetCount + " changed parameters"
+        }
+    }
+
+    function markParameterSaved(parameterId, failed) {
+        currentParameterId = parameterId
+        completedCount += 1
+        if (failed) {
+            failedCount += 1
+        }
+
+        if (completedCount < targetCount) {
+            statusMessage = "Saved " + completedCount + " of " + targetCount + " changed parameters"
+            return
+        }
+
+        if (failedCount > 0) {
+            finishSave()
+            return
+        }
+
+        statusMessage = "Persisting parameter changes"
+        droneSession.saveParameters(function() {
+            finishSave()
+        }, function(error) {
+            saving = false
+            currentParameterId = -1
+            statusMessage = "Parameter persist failed: " + error.reason
+        })
+    }
+
+    function saveAll() {
+        if (saving || reading) {
+            return
+        }
+        if (!droneSession.isOpen) {
+            statusMessage = "Connect to a drone before saving parameters"
+            return
+        }
+
+        var ids = store.dirtyParameterIds()
+        if (ids.length === 0) {
+            statusMessage = "No parameter changes to save"
+            return
+        }
+
+        saving = true
+        targetCount = ids.length
+        completedCount = 0
+        failedCount = 0
+        currentParameterId = -1
+        statusMessage = "Saving " + targetCount + " changed parameters"
+
+        for (var i = 0; i < ids.length; ++i) {
+            let parameterId = Number(ids[i])
+            store.writeParameter(parameterId, function() {
+                markParameterSaved(parameterId, false)
+            }, function(error) {
+                console.warn("Parameter write failed:", parameterId, error.reason)
+                markParameterSaved(parameterId, true)
+            }, "ParameterPage")
+        }
+    }
+
     function readAll() {
-        if (reading) {
+        if (reading || saving) {
             return
         }
         if (!droneSession.isOpen) {
@@ -181,43 +262,83 @@ Rectangle {
         anchors.top: parent.top
         anchors.left: parent.left
         anchors.right: parent.right
-        height: 58
-        color: "#ffffff"
-        border.color: "#d7dce3"
-        border.width: 1
+        height: 48
+        color: "transparent"
 
         Row {
             anchors.left: parent.left
-            anchors.leftMargin: 18
+            anchors.leftMargin: 16
             anchors.verticalCenter: parent.verticalCenter
-            spacing: 12
+            spacing: 16
 
-            Button {
+            ToolbarButton {
                 id: readButton
-                width: 92
-                height: 32
+                width: 96
                 text: reading ? "Reading" : "Read All"
-                enabled: droneSession.isOpen && !reading
+                enabled: droneSession.isOpen && !reading && !saving
                 onClicked: readAll()
             }
 
+            ToolbarButton {
+                id: saveButton
+                width: 74
+                text: saving ? "Saving" : "Save"
+                enabled: droneSession.isOpen && !reading && !saving && store.dirtyCount > 0
+                onClicked: saveAll()
+            }
+
             ProgressBar {
-                width: 180
-                height: 12
+                id: operationProgress
+                width: 150
+                height: 6
                 anchors.verticalCenter: parent.verticalCenter
                 from: 0
                 to: Math.max(targetCount, 1)
                 value: completedCount
-                visible: reading || completedCount > 0
+                visible: reading || saving || completedCount > 0
+
+                background: Rectangle {
+                    implicitWidth: 150
+                    implicitHeight: 6
+                    radius: 3
+                    color: "#e8edf3"
+                }
+
+                contentItem: Item {
+                    implicitWidth: 150
+                    implicitHeight: 6
+
+                    Rectangle {
+                        width: operationProgress.visualPosition * parent.width
+                        height: parent.height
+                        radius: 3
+                        color: root.statusColor()
+                    }
+                }
             }
 
-            Text {
-                width: 420
+            Row {
+                height: 32
                 anchors.verticalCenter: parent.verticalCenter
-                text: statusMessage
-                color: reading ? "#1f5fbf" : "#4b5563"
-                font.pixelSize: 14
-                elide: Text.ElideRight
+                spacing: 8
+
+                Rectangle {
+                    width: 10
+                    height: 10
+                    radius: 5
+                    color: root.statusColor()
+                    anchors.verticalCenter: parent.verticalCenter
+                }
+
+                Text {
+                    width: 460
+                    anchors.verticalCenter: parent.verticalCenter
+                    text: statusMessage
+                    color: "#2b3036"
+                    font.pixelSize: 15
+                    font.bold: true
+                    elide: Text.ElideRight
+                }
             }
         }
     }
@@ -228,9 +349,13 @@ Rectangle {
         anchors.left: parent.left
         anchors.right: parent.right
         anchors.bottom: parent.bottom
-        anchors.margins: 18
+        anchors.leftMargin: 16
+        anchors.rightMargin: 16
+        anchors.topMargin: 8
+        anchors.bottomMargin: 14
+        radius: 8
         color: "#ffffff"
-        border.color: "#c7cdd4"
+        border.color: "#dfe4ea"
         border.width: 1
         clip: true
 
@@ -239,9 +364,9 @@ Rectangle {
             anchors.top: parent.top
             anchors.left: parent.left
             anchors.right: parent.right
-            height: 36
-            color: "#edf0f4"
-            border.color: "#d9dee5"
+            height: 44
+            color: "#f8fafc"
+            border.color: "#e2e7ee"
             border.width: 1
 
             Row {
@@ -293,10 +418,46 @@ Rectangle {
                         text: model.name && model.name.length > 0 ? model.name : "-"
                         textColor: model.hasDefinition ? "#111827" : "#6b7280"
                     }
-                    BodyCell {
+                    Item {
                         width: root.columnWidth(2)
-                        text: root.valueText(model.value, model.valueHex, model.hasValue)
-                        textColor: model.hasValue ? "#0f5132" : "#6b7280"
+                        height: parent.height
+
+                        TextField {
+                            id: valueEditor
+                            anchors.left: parent.left
+                            anchors.right: parent.right
+                            anchors.top: parent.top
+                            anchors.bottom: parent.bottom
+                            anchors.leftMargin: 5
+                            anchors.rightMargin: 5
+                            anchors.topMargin: 3
+                            anchors.bottomMargin: 3
+                            text: root.valueText(model.value, model.valueHex, model.hasValue)
+                            enabled: model.editable && model.hasDefinition && model.hasValue && !reading && !saving
+                            selectByMouse: true
+                            font.pixelSize: 14
+                            color: model.dirty ? "#8a4b00" : (model.hasValue ? "#0f5132" : "#6b7280")
+                            padding: 4
+                            verticalAlignment: TextInput.AlignVCenter
+
+                            onEditingFinished: {
+                                if (!enabled) {
+                                    return
+                                }
+
+                                var currentText = root.valueText(model.value, model.valueHex, model.hasValue)
+                                if (text !== currentText) {
+                                    root.store.setParameterValueText(model.parameterId, text, "ParameterPage")
+                                }
+                            }
+
+                            background: Rectangle {
+                                color: valueEditor.enabled ? "#ffffff" : "transparent"
+                                border.color: valueEditor.activeFocus ? "#4c8bf5" : (model.dirty ? "#d18a00" : "#d7dce3")
+                                border.width: valueEditor.enabled || model.dirty ? 1 : 0
+                                radius: 3
+                            }
+                        }
                     }
                     BodyCell {
                         width: root.columnWidth(3)
@@ -304,8 +465,8 @@ Rectangle {
                     }
                     BodyCell {
                         width: root.columnWidth(4)
-                        text: model.busy ? model.busyReason : (model.lastError.length > 0 ? "Error" : "Ready")
-                        textColor: model.busy ? "#1f5fbf" : (model.lastError.length > 0 ? "#b42318" : "#4b5563")
+                        text: model.busy ? model.busyReason : (model.lastError.length > 0 ? "Error" : (model.dirty ? "Modified" : "Ready"))
+                        textColor: model.busy ? "#1f5fbf" : (model.lastError.length > 0 ? "#b42318" : (model.dirty ? "#8a4b00" : "#4b5563"))
                     }
                     BodyCell {
                         width: root.columnWidth(5)
@@ -386,6 +547,38 @@ Rectangle {
                 color: resizeArea.pressed || resizeArea.containsMouse ? "#4c8bf5" : divider.color
                 opacity: resizeArea.pressed || resizeArea.containsMouse ? 1 : 0
             }
+        }
+    }
+
+    component ToolbarButton: Button {
+        id: button
+        height: 32
+        padding: 0
+        leftPadding: 0
+        rightPadding: 0
+        topPadding: 0
+        bottomPadding: 0
+        opacity: 1.0
+
+        contentItem: Text {
+            text: button.text
+            color: button.enabled ? "#2b3036" : "#c9ced6"
+            font.pixelSize: 15
+            font.bold: true
+            horizontalAlignment: Text.AlignHCenter
+            verticalAlignment: Text.AlignVCenter
+            elide: Text.ElideRight
+        }
+
+        background: Rectangle {
+            radius: 7
+            color: button.enabled
+                   ? (button.down ? "#edf2f7" : "#ffffff")
+                   : "#fbfcfd"
+            border.color: button.enabled
+                          ? (button.hovered ? "#cfd6df" : "#dde3ea")
+                          : "#e8ecf1"
+            border.width: 1
         }
     }
 
