@@ -343,48 +343,53 @@
         "desc":"",
         "params":[
             {
+                "name":"dt",
+                "type":"UInt32",
+                "desc":""
+            },
+            {
                 "name":"ACCEL_X",
-                "type":"Int16",
+                "type":"Float",
                 "desc":""
             },
             {
                 "name":"ACCEL_Y",
-                "type":"Int16",
+                "type":"Float",
                 "desc":""
             },
             {
                 "name":"ACCEL_Z",
-                "type":"Int16",
+                "type":"Float",
                 "desc":""
             },
             {
                 "name":"ROLL",
-                "type":"Int8",
+                "type":"Float",
                 "desc":""
             },
             {
                 "name":"PITCH",
-                "type":"Int8",
+                "type":"Float",
                 "desc":""
             },
             {
                 "name":"YAW",
-                "type":"Int8",
+                "type":"Float",
                 "desc":""
             },
             {
                 "name":"GYRO_X",
-                "type":"Int16",
+                "type":"Float",
                 "desc":""
             },
             {
                 "name":"GYRO_Y",
-                "type":"Int16",
+                "type":"Float",
                 "desc":""
             },
             {
                 "name":"GYRO_Z",
-                "type":"Int16",
+                "type":"Float",
                 "desc":""
             },
             {
@@ -394,17 +399,17 @@
             },
             {
                 "name":"SP_ROLL",
-                "type":"Int8",
+                "type":"Float",
                 "desc":""
             },
             {
                 "name":"SP_PITCH",
-                "type":"Int8",
+                "type":"Float",
                 "desc":""
             },
             {
                 "name":"SP_YAW",
-                "type":"Int8",
+                "type":"Float",
                 "desc":""
             },
             {
@@ -428,43 +433,168 @@
                 "desc":""
             },
             {
-                "name":"PID.RATE.P",
+                "name":"ACCEL_RAW_X",
                 "type":"Int16",
                 "desc":""
             },
             {
-                "name":"PID.RATE.I",
+                "name":"ACCEL_RAW_Y",
                 "type":"Int16",
                 "desc":""
             },
             {
-                "name":"PID.RATE.D",
+                "name":"ACCEL_RAW_Z",
                 "type":"Int16",
                 "desc":""
             },
             {
-                "name":"PID.RATE.O",
+                "name":"GYRO_RAW_X",
                 "type":"Int16",
                 "desc":""
             },
             {
-                "name":"PID.ANGLE.P",
+                "name":"GYRO_RAW_Y",
                 "type":"Int16",
                 "desc":""
             },
             {
-                "name":"PID.ANGLE.I",
+                "name":"GYRO_RAW_Z",
                 "type":"Int16",
                 "desc":""
             },
             {
-                "name":"PID.ANGLE.D",
-                "type":"Int16",
+                "name":"GYRO_SP_X",
+                "type":"Float",
                 "desc":""
             },
             {
-                "name":"PID.ANGLE.O",
-                "type":"Int16",
+                "name":"GYRO_SP_Y",
+                "type":"Float",
+                "desc":""
+            },
+            {
+                "name":"GYRO_SP_Z",
+                "type":"Float",
+                "desc":""
+            },
+            {
+                "name":"PID.RATE.ROLL.P",
+                "type":"Float",
+                "desc":""
+            },
+            {
+                "name":"PID.RATE.ROLL.I",
+                "type":"Float",
+                "desc":""
+            },
+            {
+                "name":"PID.RATE.ROLL.D",
+                "type":"Float",
+                "desc":""
+            },
+            {
+                "name":"PID.RATE.ROLL.O",
+                "type":"Float",
+                "desc":""
+            },
+            {
+                "name":"PID.ANGLE.ROLL.P",
+                "type":"Float",
+                "desc":""
+            },
+            {
+                "name":"PID.ANGLE.ROLL.I",
+                "type":"Float",
+                "desc":""
+            },
+            {
+                "name":"PID.ANGLE.ROLL.D",
+                "type":"Float",
+                "desc":""
+            },
+            {
+                "name":"PID.ANGLE.ROLL.O",
+                "type":"Float",
+                "desc":""
+            },
+            {
+                "name":"PID.RATE.PITCH.P",
+                "type":"Float",
+                "desc":""
+            },
+            {
+                "name":"PID.RATE.PITCH.I",
+                "type":"Float",
+                "desc":""
+            },
+            {
+                "name":"PID.RATE.PITCH.D",
+                "type":"Float",
+                "desc":""
+            },
+            {
+                "name":"PID.RATE.PITCH.O",
+                "type":"Float",
+                "desc":""
+            },
+            {
+                "name":"PID.ANGLE.PITCH.P",
+                "type":"Float",
+                "desc":""
+            },
+            {
+                "name":"PID.ANGLE.PITCH.I",
+                "type":"Float",
+                "desc":""
+            },
+            {
+                "name":"PID.ANGLE.PITCH.D",
+                "type":"Float",
+                "desc":""
+            },
+            {
+                "name":"PID.ANGLE.PITCH.O",
+                "type":"Float",
+                "desc":""
+            },
+            {
+                "name":"PID.RATE.YAW.P",
+                "type":"Float",
+                "desc":""
+            },
+            {
+                "name":"PID.RATE.YAW.I",
+                "type":"Float",
+                "desc":""
+            },
+            {
+                "name":"PID.RATE.YAW.D",
+                "type":"Float",
+                "desc":""
+            },
+            {
+                "name":"PID.RATE.YAW.O",
+                "type":"Float",
+                "desc":""
+            },
+            {
+                "name":"PID.ANGLE.YAW.P",
+                "type":"Float",
+                "desc":""
+            },
+            {
+                "name":"PID.ANGLE.YAW.I",
+                "type":"Float",
+                "desc":""
+            },
+            {
+                "name":"PID.ANGLE.YAW.D",
+                "type":"Float",
+                "desc":""
+            },
+            {
+                "name":"PID.ANGLE.YAW.O",
+                "type":"Float",
                 "desc":""
             }
         ]

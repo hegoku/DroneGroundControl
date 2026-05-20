@@ -6,10 +6,50 @@ import QtQuick.Controls 2.15
 
 Item {
     id: battery
-    property real level: 0.75    // 0..1
+    property real voltage: 0
+    property int battery_count: 1
+    readonly property real cellVoltage: battery.battery_count > 0 ? battery.voltage / battery.battery_count : 0
+    property real level: levelForCellVoltage(cellVoltage)
     property bool charging: false
     property int warningThreshold: 20
     property int criticalThreshold: 10
+    readonly property var voltageLevelCurve: [
+        { volts: 4.20, level: 1.00 },
+        { volts: 4.10, level: 0.90 },
+        { volts: 4.00, level: 0.75 },
+        { volts: 3.90, level: 0.55 },
+        { volts: 3.80, level: 0.35 },
+        { volts: 3.70, level: 0.20 },
+        { volts: 3.60, level: 0.10 },
+        { volts: 3.50, level: 0.05 },
+        { volts: 3.30, level: 0.00 }
+    ]
+
+    function levelForCellVoltage(volts) {
+        if (volts <= 0 || voltageLevelCurve.length === 0) {
+            return 0
+        }
+
+        if (volts >= voltageLevelCurve[0].volts) {
+            return voltageLevelCurve[0].level
+        }
+
+        for (let i = 1; i < voltageLevelCurve.length; ++i) {
+            const upper = voltageLevelCurve[i - 1]
+            const lower = voltageLevelCurve[i]
+            if (volts >= lower.volts) {
+                const span = upper.volts - lower.volts
+                if (span <= 0) {
+                    return lower.level
+                }
+
+                const ratio = (volts - lower.volts) / span
+                return lower.level + ratio * (upper.level - lower.level)
+            }
+        }
+
+        return voltageLevelCurve[voltageLevelCurve.length - 1].level
+    }
 
     // default size (can be overridden by parent)
     width: 200
@@ -85,7 +125,7 @@ Item {
     Text {
         id: percent
         anchors.centerIn: shell
-        text: Math.round(battery.level * 100) + "%"
+        text: battery.voltage.toFixed(2) + "V"
         font.pixelSize: Math.max(10, shell.height * 0.45)
         font.bold: true
         color: "white"

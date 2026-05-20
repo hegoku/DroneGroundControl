@@ -51,6 +51,11 @@ int main(int argc, char *argv[])
                      Qt::QueuedConnection);
     QObject::connect(&connectionSession,
                      &ConnectionSession::telemetryFramesReceived,
+                     &flight,
+                     &Flight::processFrames,
+                     Qt::QueuedConnection);
+    QObject::connect(&connectionSession,
+                     &ConnectionSession::telemetryFramesReceived,
                      &rcChannelModel,
                      &RcChannelModel::processFrames,
                      Qt::QueuedConnection);

@@ -168,7 +168,8 @@ ApplicationWindow {
                 height: parent.height
                 Battery {
                     id: batteryWidget
-                    level: 0.65
+                    voltage: flight.voltage
+                    battery_count: flight.battery_count
                     charging: false
                     width: 80
                     height: 40
