@@ -1,5 +1,6 @@
 import QtQuick
 import QtQuick.Controls
+import QtQuick.Controls.impl
 
 import "./components"
 
@@ -271,41 +272,72 @@ ApplicationWindow {
                 clip: true
 
                 model: ListModel {
-                    ListElement { name: "Home";    page: "pages/HomePage.qml" }
-                    ListElement { name: "Parameters";    page: "pages/ParameterPage.qml" }
-                    ListElement { name: "Data Frame";    page: "pages/DataFrameTablePage.qml" }
-                    ListElement { name: "Data Analysis";    page: "pages/DataChartPage.qml" }
-                    ListElement { name: "Qt Graphs";    page: "pages/DataChartGraphsPage.qml" }
-                    ListElement { name: "RC";    page: "pages/RC.qml" }
+                    ListElement { name: "Home"; page: "pages/HomePage.qml"; iconSource: "qrc:/resources/icons/home.svg" }
+                    ListElement { name: "Parameters"; page: "pages/ParameterPage.qml"; iconSource: "qrc:/resources/icons/basic-setting.svg" }
+                    ListElement { name: "Data Frame"; page: "pages/DataFrameTablePage.qml"; iconSource: "qrc:/resources/icons/interface-ui-table-calendar.svg" }
+                    ListElement { name: "Data Analysis"; page: "pages/DataChartPage.qml"; iconSource: "qrc:/resources/icons/chart.svg" }
+                    ListElement { name: "Qt Graphs"; page: "pages/DataChartGraphsPage.qml"; iconSource: "qrc:/resources/icons/chart.svg" }
+                    ListElement { name: "RC"; page: "pages/RC.qml"; iconSource: "qrc:/resources/icons/game.svg" }
                 }
 
-                delegate: Item {
+                delegate: Button {
                     id: menuItem
                     width: parent.width
                     height: 50
+                    text: name
+                    flat: true
+                    hoverEnabled: true
+                    padding: 0
+                    leftPadding: 18
+                    rightPadding: 10
+                    spacing: 10
+                    display: AbstractButton.TextBesideIcon
+                    palette.buttonText: selected ? "white" : "#CCCCCC"
+                    font.pixelSize: 13
+
+                    icon.source: iconSource
+                    icon.width: 20
+                    icon.height: 20
+                    icon.color: "white"
 
                     property bool selected: ListView.isCurrentItem
 
-                    Rectangle {
+                    background: Rectangle {
                         id: bgRect
-                        anchors.fill: parent
                         color: selected ? "#4C8BF5" : "transparent"
                     }
 
-                    Text {
-                        text: name
-                        anchors.centerIn: parent
-                        font.pixelSize: 18
-                        color: selected ? "white" : "#CCCCCC"
+                    contentItem: Row {
+                        spacing: menuItem.spacing
+
+                        IconImage {
+                            source: menuItem.icon.source
+                            color: menuItem.icon.color
+                            sourceSize.width: menuItem.icon.width
+                            sourceSize.height: menuItem.icon.height
+                            width: menuItem.icon.width
+                            height: menuItem.icon.height
+                            anchors.verticalCenter: parent.verticalCenter
+                        }
+
+                        Text {
+                            text: menuItem.text
+                            color: menuItem.palette.buttonText
+                            font: menuItem.font
+                            elide: Text.ElideRight
+                            verticalAlignment: Text.AlignVCenter
+                            width: menuItem.availableWidth - menuItem.icon.width - parent.spacing
+                            height: parent.height
+                        }
                     }
 
-                    MouseArea {
-                        anchors.fill: parent
+                    HoverHandler {
                         cursorShape: Qt.PointingHandCursor
-                        onClicked: {
-                            menuList.currentIndex = index
-                            pageLoader.source = Qt.resolvedUrl(page)
-                        }
+                    }
+
+                    onClicked: {
+                        menuList.currentIndex = index
+                        pageLoader.source = Qt.resolvedUrl(page)
                     }
                 }
             }

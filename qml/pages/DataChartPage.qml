@@ -82,6 +82,8 @@ Rectangle {
                 id: csvChartModel
                 receiving: false
                 autoScroll: true
+                dragEnabled: true
+                cropEnabled: true
             }
 
             Component.onCompleted: {
@@ -170,6 +172,7 @@ Rectangle {
         property var benchmarkRunner
         property bool showBenchmarkStatus: false
         property bool showReceiveButton: false
+        property bool showFullButton: true
         property bool showAutoScrollButton: false
         property bool showDragButton: true
         property bool showCursorButton: true
@@ -209,6 +212,13 @@ Rectangle {
                 tooltip: chartPanel.chartModel && chartPanel.chartModel.receiving ? "Pause receiving chart data" : "Start receiving chart data"
                 checked: chartPanel.chartModel && chartPanel.chartModel.receiving
                 onClicked: chartPanel.chartModel.receiving = !chartPanel.chartModel.receiving
+            }
+
+            ChartToolButton {
+                visible: chartPanel.showFullButton
+                iconSource: "qrc:/resources/icons/histogram-show-all.svg"
+                tooltip: "Show full chart"
+                onClicked: chartPanel.chartModel.showFullChart()
             }
 
             ChartToolButton {

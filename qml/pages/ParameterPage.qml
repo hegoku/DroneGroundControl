@@ -1,5 +1,6 @@
 import QtQuick
 import QtQuick.Controls
+import "../components"
 
 Rectangle {
     id: root
@@ -271,17 +272,21 @@ Rectangle {
             anchors.verticalCenter: parent.verticalCenter
             spacing: 16
 
-            ToolbarButton {
+            StyledButton {
                 id: readButton
                 width: 96
+                height: 32
+                styleName: "primary-button"
                 text: reading ? "Reading" : "Read All"
                 enabled: droneSession.isOpen && !reading && !saving
                 onClicked: readAll()
             }
 
-            ToolbarButton {
+            StyledButton {
                 id: saveButton
                 width: 74
+                height: 32
+                styleName: "primary-button"
                 text: saving ? "Saving" : "Save"
                 enabled: droneSession.isOpen && !reading && !saving && store.dirtyCount > 0
                 onClicked: saveAll()
@@ -547,38 +552,6 @@ Rectangle {
                 color: resizeArea.pressed || resizeArea.containsMouse ? "#4c8bf5" : divider.color
                 opacity: resizeArea.pressed || resizeArea.containsMouse ? 1 : 0
             }
-        }
-    }
-
-    component ToolbarButton: Button {
-        id: button
-        height: 32
-        padding: 0
-        leftPadding: 0
-        rightPadding: 0
-        topPadding: 0
-        bottomPadding: 0
-        opacity: 1.0
-
-        contentItem: Text {
-            text: button.text
-            color: button.enabled ? "#2b3036" : "#c9ced6"
-            font.pixelSize: 15
-            font.bold: true
-            horizontalAlignment: Text.AlignHCenter
-            verticalAlignment: Text.AlignVCenter
-            elide: Text.ElideRight
-        }
-
-        background: Rectangle {
-            radius: 7
-            color: button.enabled
-                   ? (button.down ? "#edf2f7" : "#ffffff")
-                   : "#fbfcfd"
-            border.color: button.enabled
-                          ? (button.hovered ? "#cfd6df" : "#dde3ea")
-                          : "#e8ecf1"
-            border.width: 1
         }
     }
 

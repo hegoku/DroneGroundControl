@@ -217,9 +217,9 @@ Rectangle {
                     axisX: ValueAxis {
                         id: axisX
                         min: 0
-                        max: 1000000
+                        max: 6000
                         labelFormat: "%.6f"
-                        tickInterval: 200000
+                        tickInterval: 1200
                         subTickCount: 1
                         labelDecimals: 0
                         labelDelegate: Item {

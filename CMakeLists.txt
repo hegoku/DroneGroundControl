@@ -20,6 +20,8 @@ qt_add_executable(appDroneGroundControl
     src/app/ParameterStore.cpp
     src/app/Flight.h
     src/app/Flight.cpp
+    src/app/RcChannelModel.h
+    src/app/RcChannelModel.cpp
     src/app/DataChartModel.h
     src/app/DataChartModel.cpp
     src/app/DataChartGraphsAdapter.h
@@ -49,6 +51,23 @@ target_include_directories(appDroneGroundControl
     PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src/app
 )
 
+if(APPLE)
+    set(APP_ICON_MACOS "${CMAKE_CURRENT_SOURCE_DIR}/resources/icons/app.icns")
+    set_source_files_properties(${APP_ICON_MACOS} PROPERTIES
+        MACOSX_PACKAGE_LOCATION "Resources"
+    )
+    target_sources(appDroneGroundControl PRIVATE ${APP_ICON_MACOS})
+    set_target_properties(appDroneGroundControl PROPERTIES
+        MACOSX_BUNDLE_ICON_FILE "app.icns"
+    )
+endif()
+
+if(WIN32)
+    target_sources(appDroneGroundControl PRIVATE
+        "${CMAKE_CURRENT_SOURCE_DIR}/resources/icons/app.rc"
+    )
+endif()
+
 qt_add_qml_module(appDroneGroundControl
     URI DroneGroundControl
     VERSION 1.0
@@ -59,11 +78,15 @@ qt_add_qml_module(appDroneGroundControl
         qml/pages/DataChartPage.qml
         qml/pages/DataChartGraphsPage.qml
         qml/pages/DataFrameTablePage.qml
+        qml/pages/RC.qml
         qml/components/Battery.qml
         qml/components/SensorStatus.qml
         qml/components/ConnectionButton.qml
         qml/components/SerialPortConnection.qml
         qml/components/UdpConnection.qml
+        qml/components/StyledButton.qml
+        qml/components/StyledPanel.qml
+        qml/components/StyledSelect.qml
     RESOURCES resource.qrc
 
 )

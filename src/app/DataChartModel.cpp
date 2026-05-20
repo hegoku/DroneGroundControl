@@ -20,6 +20,8 @@ namespace {
 constexpr int ChartUpdateIntervalMs = 33;
 constexpr int MinimumMaxSamples = 1000;
 constexpr int MaximumMaxSamples = 2000000;
+constexpr double ZoomInFactor = 0.95;
+constexpr double ZoomOutFactor = 1.0 / ZoomInFactor;
 }
 
 DataChartModel::DataChartModel(QObject *parent)
@@ -113,7 +115,6 @@ void DataChartModel::setAutoScroll(bool autoScroll)
 
     m_autoScroll = autoScroll;
     if (m_autoScroll) {
-        clearManualValueRange();
         updateViewRangeAfterSample(m_latestSample);
     }
     emit autoScrollChanged();
@@ -336,14 +337,49 @@ void DataChartModel::clearData()
     emit chartChanged();
 }
 
+void DataChartModel::showFullChart()
+{
+    if (m_sampleCount <= 0) {
+        clearManualValueRange();
+        m_viewLower = 0.0;
+        m_viewUpper = m_visibleSampleSpan;
+        emit chartChanged();
+        return;
+    }
+
+    const double firstSample = static_cast<double>(m_firstSample);
+    const double newestSample = static_cast<double>(m_firstSample + static_cast<quint64>(m_sampleCount - 1));
+    const double fullSpan = std::max(2.0, newestSample - firstSample);
+    const double boundedSpan = clampedVisibleSampleSpan(fullSpan);
+    if (!qFuzzyCompare(m_visibleSampleSpan, boundedSpan)) {
+        m_visibleSampleSpan = boundedSpan;
+        emit visibleSampleSpanChanged();
+    }
+
+    const double center = (firstSample + newestSample) * 0.5;
+    moveVisibleRange(center - boundedSpan * 0.5);
+
+    clearManualValueRange();
+    double yLower = -1.0;
+    double yUpper = 1.0;
+    valueRange(m_viewLower, m_viewUpper, &yLower, &yUpper);
+    setManualValueRange(yLower, yUpper);
+}
+
 void DataChartModel::zoomIn()
 {
-    setVisibleSampleSpan(m_visibleSampleSpan * 0.5);
+    if (m_autoScroll) {
+        setAutoScroll(false);
+    }
+    setVisibleSampleSpan(m_visibleSampleSpan * ZoomInFactor);
 }
 
 void DataChartModel::zoomOut()
 {
-    setVisibleSampleSpan(m_visibleSampleSpan * 2.0);
+    if (m_autoScroll) {
+        setAutoScroll(false);
+    }
+    setVisibleSampleSpan(m_visibleSampleSpan * ZoomOutFactor);
 }
 
 void DataChartModel::panByPixels(double pixelDelta, double pixelWidth)
@@ -364,6 +400,10 @@ void DataChartModel::panValueRangeByPixels(double pixelDelta, double pixelHeight
 {
     if (qFuzzyIsNull(pixelDelta) || pixelHeight <= 1.0) {
         return;
+    }
+
+    if (m_autoScroll) {
+        setAutoScroll(false);
     }
 
     double currentLower = -1.0;
@@ -398,7 +438,8 @@ void DataChartModel::zoomToSampleRange(double lower, double upper)
         m_visibleSampleSpan = boundedSpan;
         emit visibleSampleSpanChanged();
     }
-    moveVisibleRange(lower);
+    const double center = (lower + upper) * 0.5;
+    moveVisibleRange(center - boundedSpan * 0.5);
 }
 
 void DataChartModel::zoomOutFromSampleRange(double lower, double upper)
@@ -432,8 +473,37 @@ void DataChartModel::zoomOutFromSampleRange(double lower, double upper)
 
 void DataChartModel::zoomToChartRange(double xLower, double xUpper, double yLower, double yUpper)
 {
-    zoomToSampleRange(xLower, xUpper);
-    setManualValueRange(yLower, yUpper);
+    if (!std::isfinite(xLower) || !std::isfinite(xUpper) || !std::isfinite(yLower) || !std::isfinite(yUpper)) {
+        return;
+    }
+
+    if (xLower > xUpper) {
+        std::swap(xLower, xUpper);
+    }
+    if (yLower > yUpper) {
+        std::swap(yLower, yUpper);
+    }
+
+    const double selectedXSpan = xUpper - xLower;
+    const double selectedYSpan = yUpper - yLower;
+    if (selectedXSpan < 2.0 || selectedYSpan <= 1e-9) {
+        return;
+    }
+
+    if (m_autoScroll) {
+        setAutoScroll(false);
+    }
+
+    const double xCenter = (xLower + xUpper) * 0.5;
+    const double yCenter = (yLower + yUpper) * 0.5;
+    const double boundedXSpan = clampedVisibleSampleSpan(selectedXSpan);
+    const double boundedYSpan = std::max(selectedYSpan, 1e-9);
+    if (!qFuzzyCompare(m_visibleSampleSpan, boundedXSpan)) {
+        m_visibleSampleSpan = boundedXSpan;
+        emit visibleSampleSpanChanged();
+    }
+    moveVisibleRange(xCenter - boundedXSpan * 0.5);
+    setManualValueRange(yCenter - boundedYSpan * 0.5, yCenter + boundedYSpan * 0.5);
 }
 
 void DataChartModel::zoomOutFromChartRange(double xLower, double xUpper, double yLower, double yUpper)
@@ -471,6 +541,10 @@ void DataChartModel::zoomValueRange(double center, double factor)
 {
     if (!std::isfinite(center) || !std::isfinite(factor) || factor <= 0.0) {
         return;
+    }
+
+    if (m_autoScroll) {
+        setAutoScroll(false);
     }
 
     double currentLower = -1.0;
@@ -645,8 +719,7 @@ bool DataChartModel::loadCsv(const QUrl &fileUrl)
     for (int row = 0; row < m_series.size(); ++row) {
         emit dataChanged(index(row, 0), index(row, 0), {ValueRole});
     }
-    updateViewRangeAfterSample(m_latestSample);
-    emit chartChanged();
+    showFullChart();
     return true;
 }
 

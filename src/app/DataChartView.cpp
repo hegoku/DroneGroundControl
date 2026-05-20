@@ -11,6 +11,11 @@
 #include <limits>
 #include <utility>
 
+namespace {
+constexpr double WheelZoomInFactor = 0.95;
+constexpr double WheelZoomOutFactor = 1.0 / WheelZoomInFactor;
+}
+
 DataChartView::DataChartView(QQuickItem *parent)
     : QQuickPaintedItem(parent)
 {
@@ -295,15 +300,20 @@ void DataChartView::wheelEvent(QWheelEvent *event)
         return;
     }
 
-    const QPointF cursor = clampToPlot(event->position());
-    const double valueCenter = valueAtPlotY(cursor.y());
+    double xLower = 0.0;
+    double xUpper = 1.0;
+    double yLower = -1.0;
+    double yUpper = 1.0;
+    m_model->displayRange(&xLower, &xUpper);
+    m_model->valueRange(xLower, xUpper, &yLower, &yUpper);
+    const double valueCenter = (yLower + yUpper) * 0.5;
 
     if (event->angleDelta().y() > 0) {
         m_model->zoomIn();
-        m_model->zoomValueRange(valueCenter, 0.5);
+        m_model->zoomValueRange(valueCenter, WheelZoomInFactor);
     } else if (event->angleDelta().y() < 0) {
         m_model->zoomOut();
-        m_model->zoomValueRange(valueCenter, 2.0);
+        m_model->zoomValueRange(valueCenter, WheelZoomOutFactor);
     }
     event->accept();
 }

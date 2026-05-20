@@ -76,6 +76,7 @@ public:
     Q_INVOKABLE void hideAll();
     Q_INVOKABLE void showAll();
     Q_INVOKABLE void clearData();
+    Q_INVOKABLE void showFullChart();
     Q_INVOKABLE void zoomIn();
     Q_INVOKABLE void zoomOut();
     Q_INVOKABLE void panByPixels(double pixelDelta, double pixelWidth);
@@ -209,9 +210,9 @@ private:
     bool m_dragEnabled = false;
     bool m_cropEnabled = false;
     int m_maxSamples = 1000000;
-    double m_visibleSampleSpan = 1000000.0;
+    double m_visibleSampleSpan = 6000.0;
     double m_viewLower = 0.0;
-    double m_viewUpper = 1000000.0;
+    double m_viewUpper = 6000.0;
     double m_manualValueLower = -1.0;
     double m_manualValueUpper = 1.0;
     double m_latestSample = 0.0;
