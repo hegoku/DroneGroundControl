@@ -10,6 +10,7 @@ Rectangle {
 
     readonly property int rcProtocolParameterId: 59
     readonly property var protocolOptions: ["IBUS", "PC"]
+    readonly property int pageFontSize: 13
     property var store: droneSession.parameterStore
     property int loadedProtocol: 0
     property int selectedProtocol: 0
@@ -89,7 +90,10 @@ Rectangle {
                 statusMessage = "Persisting RC settings"
                 droneSession.saveParameters(function() {
                     statusMessage = "Sending reboot command"
-                    droneSession.sendAnotcCommand(0, 0, 3, "", function() {
+                    droneSession.sendAnotcCommand(connectionSessionBridge.commandRebootCid0,
+                                                  connectionSessionBridge.commandRebootCid1,
+                                                  connectionSessionBridge.commandRebootCid2,
+                                                  "", function() {
                         loadedProtocol = selectedProtocol
                         savingProtocol = false
                         statusMessage = "RC protocol saved; reboot command sent"
@@ -128,7 +132,7 @@ Rectangle {
 
     ScrollView {
         anchors.fill: parent
-        anchors.margins: 18
+        anchors.margins: 5
         clip: true
 
         ColumnLayout {
@@ -145,43 +149,53 @@ Rectangle {
                     title: "RC Settings"
                     Layout.fillWidth: true
                     Layout.preferredWidth: 420
-                    Layout.preferredHeight: 220
+                    Layout.preferredHeight: 188
                     Layout.minimumWidth: 320
                     Layout.alignment: Qt.AlignTop
 
                     ColumnLayout {
                         anchors.fill: parent
-                        anchors.margins: 18
-                        spacing: 18
+                        anchors.margins: 16
+                        spacing: 12
 
                         RowLayout {
                             Layout.fillWidth: true
-                            spacing: 18
+                            spacing: 16
 
                             Text {
                                 text: "Protocol"
                                 color: "#2f343b"
-                                font.pixelSize: 16
+                                font.pixelSize: root.pageFontSize
                                 Layout.preferredWidth: 130
                             }
 
                             StyledSelect {
                                 id: protocolCombo
                                 model: root.protocolOptions
-                                currentIndex: root.selectedProtocol
                                 enabled: droneSession.isOpen && !root.loadingProtocol && !root.savingProtocol
                                 Layout.fillWidth: true
-                                Layout.preferredHeight: 36
+
+                                Component.onCompleted: currentIndex = root.selectedProtocol
 
                                 onActivated: function(index) {
                                     root.selectedProtocol = index
+                                }
+
+                                Connections {
+                                    target: root
+
+                                    function onSelectedProtocolChanged() {
+                                        if (protocolCombo.currentIndex !== root.selectedProtocol) {
+                                            protocolCombo.currentIndex = root.selectedProtocol
+                                        }
+                                    }
                                 }
                             }
                         }
 
                         Rectangle {
                             Layout.fillWidth: true
-                            height: 1
+                            Layout.preferredHeight: 1
                             color: "#e1e5eb"
                         }
 
@@ -196,8 +210,7 @@ Rectangle {
                                 styleName: "cancel-button"
                                 enabled: droneSession.isOpen && !root.loadingProtocol && !root.savingProtocol
                                          && root.selectedProtocol !== root.loadedProtocol
-                                Layout.preferredWidth: 86
-                                Layout.preferredHeight: 36
+                                Layout.preferredWidth: 78
                                 onClicked: root.cancelChanges()
                             }
 
@@ -205,8 +218,7 @@ Rectangle {
                                 text: root.savingProtocol ? "Saving..." : "Save & Reboot"
                                 styleName: "primary-button"
                                 enabled: droneSession.isOpen && !root.loadingProtocol && !root.savingProtocol
-                                Layout.preferredWidth: 128
-                                Layout.preferredHeight: 36
+                                Layout.preferredWidth: 112
                                 onClicked: root.saveAndReboot()
                             }
                         }
@@ -223,8 +235,8 @@ Rectangle {
 
                     ColumnLayout {
                         anchors.fill: parent
-                        anchors.margins: 18
-                        spacing: 10
+                        anchors.margins: 16
+                        spacing: 8
 
                         Repeater {
                             model: rcChannelModel
@@ -238,13 +250,13 @@ Rectangle {
                                 required property bool active
 
                                 Layout.fillWidth: true
-                                height: 34
-                                spacing: 16
+                                Layout.preferredHeight: 30
+                                spacing: 14
 
                                 Text {
                                     text: label
                                     color: "#333942"
-                                    font.pixelSize: 15
+                                    font.pixelSize: root.pageFontSize
                                     Layout.preferredWidth: 90
                                 }
 
@@ -253,7 +265,7 @@ Rectangle {
                                     normalized: channelRow.normalized
                                     active: channelRow.active
                                     Layout.fillWidth: true
-                                    Layout.preferredHeight: 28
+                                    Layout.preferredHeight: 24
                                 }
                             }
                         }
@@ -288,7 +300,7 @@ Rectangle {
             anchors.centerIn: parent
             text: parent.valueText
             color: parent.active ? "#1f2933" : "#6b7280"
-            font.pixelSize: 15
+            font.pixelSize: root.pageFontSize
         }
     }
 

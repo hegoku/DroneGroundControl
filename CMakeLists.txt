@@ -14,6 +14,8 @@ qt_add_executable(appDroneGroundControl
     main.cpp resource.qrc
     src/app/ConnectionSession.h
     src/app/ConnectionSession.cpp
+    src/app/ConnectionSessionBridge.h
+    src/app/ConnectionSessionBridge.cpp
     src/app/AnotcRequestManager.h
     src/app/AnotcRequestManager.cpp
     src/app/ParameterStore.h
@@ -74,6 +76,9 @@ qt_add_qml_module(appDroneGroundControl
     QML_FILES
         qml/Main.qml
         qml/pages/HomePage.qml
+        qml/pages/SensorPage.qml
+        qml/pages/SensorImuPage.qml
+        qml/pages/SensorMagnetometerPage.qml
         qml/pages/ParameterPage.qml
         qml/pages/DataChartPage.qml
         qml/pages/DataChartGraphsPage.qml
@@ -87,7 +92,11 @@ qt_add_qml_module(appDroneGroundControl
         qml/components/StyledButton.qml
         qml/components/StyledPanel.qml
         qml/components/StyledSelect.qml
+        qml/components/StyledProgressBar.qml
+        qml/components/StyledTab.qml
     RESOURCES resource.qrc
+    SOURCES src/protocol/AnotcConfigFrame.h
+    SOURCES src/protocol/AnotcCmdFrame.h
 
 )
 

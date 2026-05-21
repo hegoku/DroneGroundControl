@@ -24,15 +24,21 @@
         <file>resources/icons/interface-ui-table-calendar.svg</file>
         <file>resources/icons/chart.svg</file>
         <file>resources/icons/game.svg</file>
+        <file>resources/icons/sensor.svg</file>
         <file>resources/icons/app-master.png</file>
         <file>resources/DataFrameDefination.json</file>
         <file>qml/pages/HomePage.qml</file>
+        <file>qml/pages/SensorPage.qml</file>
+        <file>qml/pages/SensorImuPage.qml</file>
+        <file>qml/pages/SensorMagnetometerPage.qml</file>
         <file>qml/pages/ParameterPage.qml</file>
         <file>qml/pages/DataFrameTablePage.qml</file>
         <file>qml/pages/RC.qml</file>
         <file>qml/components/StyledButton.qml</file>
         <file>qml/components/StyledPanel.qml</file>
         <file>qml/components/StyledSelect.qml</file>
+        <file>qml/components/StyledProgressBar.qml</file>
+        <file>qml/components/StyledTab.qml</file>
         <file>resources/icons/drag-arrow.svg</file>
         <file>resources/icons/target.svg</file>
         <file>resources/icons/crop.svg</file>

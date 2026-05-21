@@ -268,7 +268,7 @@ Rectangle {
 
         Row {
             anchors.left: parent.left
-            anchors.leftMargin: 16
+            anchors.leftMargin: 5
             anchors.verticalCenter: parent.verticalCenter
             spacing: 16
 
@@ -292,7 +292,7 @@ Rectangle {
                 onClicked: saveAll()
             }
 
-            ProgressBar {
+            StyledProgressBar {
                 id: operationProgress
                 width: 150
                 height: 6
@@ -300,26 +300,8 @@ Rectangle {
                 from: 0
                 to: Math.max(targetCount, 1)
                 value: completedCount
+                progressColor: root.statusColor()
                 visible: reading || saving || completedCount > 0
-
-                background: Rectangle {
-                    implicitWidth: 150
-                    implicitHeight: 6
-                    radius: 3
-                    color: "#e8edf3"
-                }
-
-                contentItem: Item {
-                    implicitWidth: 150
-                    implicitHeight: 6
-
-                    Rectangle {
-                        width: operationProgress.visualPosition * parent.width
-                        height: parent.height
-                        radius: 3
-                        color: root.statusColor()
-                    }
-                }
             }
 
             Row {
@@ -354,10 +336,7 @@ Rectangle {
         anchors.left: parent.left
         anchors.right: parent.right
         anchors.bottom: parent.bottom
-        anchors.leftMargin: 16
-        anchors.rightMargin: 16
-        anchors.topMargin: 8
-        anchors.bottomMargin: 14
+        anchors.margins: 5
         radius: 8
         color: "#ffffff"
         border.color: "#dfe4ea"
@@ -427,8 +406,8 @@ Rectangle {
                         width: root.columnWidth(2)
                         height: parent.height
 
-                        TextField {
-                            id: valueEditor
+                        Rectangle {
+                            id: valueEditorFrame
                             anchors.left: parent.left
                             anchors.right: parent.right
                             anchors.top: parent.top
@@ -437,30 +416,32 @@ Rectangle {
                             anchors.rightMargin: 5
                             anchors.topMargin: 3
                             anchors.bottomMargin: 3
-                            text: root.valueText(model.value, model.valueHex, model.hasValue)
-                            enabled: model.editable && model.hasDefinition && model.hasValue && !reading && !saving
-                            selectByMouse: true
-                            font.pixelSize: 14
-                            color: model.dirty ? "#8a4b00" : (model.hasValue ? "#0f5132" : "#6b7280")
-                            padding: 4
-                            verticalAlignment: TextInput.AlignVCenter
+                            color: valueEditor.enabled ? "#ffffff" : "transparent"
+                            border.color: valueEditor.activeFocus ? "#4c8bf5" : (model.dirty ? "#d18a00" : "#d7dce3")
+                            border.width: valueEditor.enabled || model.dirty ? 1 : 0
+                            radius: 3
 
-                            onEditingFinished: {
-                                if (!enabled) {
-                                    return
+                            TextInput {
+                                id: valueEditor
+                                anchors.fill: parent
+                                anchors.margins: 4
+                                text: root.valueText(model.value, model.valueHex, model.hasValue)
+                                enabled: model.editable && model.hasDefinition && model.hasValue && !reading && !saving
+                                selectByMouse: true
+                                font.pixelSize: 14
+                                color: model.dirty ? "#8a4b00" : (model.hasValue ? "#0f5132" : "#6b7280")
+                                verticalAlignment: TextInput.AlignVCenter
+
+                                onEditingFinished: {
+                                    if (!enabled) {
+                                        return
+                                    }
+
+                                    var currentText = root.valueText(model.value, model.valueHex, model.hasValue)
+                                    if (text !== currentText) {
+                                        root.store.setParameterValueText(model.parameterId, text, "ParameterPage")
+                                    }
                                 }
-
-                                var currentText = root.valueText(model.value, model.valueHex, model.hasValue)
-                                if (text !== currentText) {
-                                    root.store.setParameterValueText(model.parameterId, text, "ParameterPage")
-                                }
-                            }
-
-                            background: Rectangle {
-                                color: valueEditor.enabled ? "#ffffff" : "transparent"
-                                border.color: valueEditor.activeFocus ? "#4c8bf5" : (model.dirty ? "#d18a00" : "#d7dce3")
-                                border.width: valueEditor.enabled || model.dirty ? 1 : 0
-                                radius: 3
                             }
                         }
                     }

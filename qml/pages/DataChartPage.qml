@@ -132,7 +132,7 @@ Rectangle {
 
     RowLayout {
         anchors.fill: parent
-        anchors.margins: 18
+        anchors.margins: 5
         spacing: 14
 
         SignalPanel {
@@ -290,61 +290,67 @@ Rectangle {
         }
     }
 
-    component ChartToolButton: Button {
+    component ChartToolButton: Item {
         id: control
+        property string text: ""
+        property bool checked: false
         property string tooltip: ""
         property url iconSource: ""
+        signal clicked()
 
         Layout.preferredWidth: 22
         Layout.preferredHeight: 22
-        checkable: false
-        font.pixelSize: 16
-        font.bold: true
-        padding: 0
-        hoverEnabled: true
-        palette.buttonText: control.checked ? "#1d4ed8" : "#111827"
+        implicitWidth: 22
+        implicitHeight: 22
+        activeFocusOnTab: enabled
 
-        ToolTip.visible: hovered && tooltip.length > 0
+        Accessible.role: Accessible.Button
+        Accessible.name: tooltip.length > 0 ? tooltip : text
+
+        ToolTip.visible: mouseArea.containsMouse && tooltip.length > 0
         ToolTip.text: tooltip
         ToolTip.delay: 450
 
-        icon.source: iconSource
-        icon.width: 18
-        icon.height: 18
-        icon.color: control.checked ? "#1d4ed8" : "#111827"
-
-        display: iconSource.toString().length > 0
-            ? AbstractButton.IconOnly
-            : AbstractButton.TextOnly
-
-        // contentItem: Item {
-        //     Image {
-        //         anchors.centerIn: parent
-        //         width: 16
-        //         height: 16
-        //         source: control.iconSource
-        //         sourceSize.width: 16
-        //         sourceSize.height: 16
-        //         visible: control.iconSource.toString().length > 0
-        //         fillMode: Image.PreserveAspectFit
-        //     }
-
-        //     Text {
-        //         anchors.fill: parent
-        //         text: control.iconSource.toString().length > 0 ? "" : control.text
-        //         color: control.checked ? "#1d4ed8" : "#111827"
-        //         font: control.font
-        //         horizontalAlignment: Text.AlignHCenter
-        //         verticalAlignment: Text.AlignVCenter
-        //     }
-        // }
-
-        background: Rectangle {
+        Rectangle {
+            anchors.fill: parent
             radius: 4
-            color: control.pressed ? "#eef2f7" : (control.hovered ? "#f7f9fc" : "transparent")
-            border.color: control.hovered ? "#cfd6df" : "transparent"
+            color: mouseArea.pressed ? "#eef2f7" : (mouseArea.containsMouse ? "#f7f9fc" : "transparent")
+            border.color: mouseArea.containsMouse ? "#cfd6df" : "transparent"
             border.width: 1
         }
+
+        Image {
+            anchors.centerIn: parent
+            width: 18
+            height: 18
+            source: control.iconSource
+            sourceSize.width: 16
+            sourceSize.height: 16
+            visible: control.iconSource.toString().length > 0
+            fillMode: Image.PreserveAspectFit
+        }
+
+        Text {
+            anchors.fill: parent
+            text: control.iconSource.toString().length > 0 ? "" : control.text
+            color: control.checked ? "#1d4ed8" : "#111827"
+            font.pixelSize: 16
+            font.bold: true
+            horizontalAlignment: Text.AlignHCenter
+            verticalAlignment: Text.AlignVCenter
+        }
+
+        MouseArea {
+            id: mouseArea
+            anchors.fill: parent
+            enabled: control.enabled
+            hoverEnabled: true
+            cursorShape: control.enabled ? Qt.PointingHandCursor : Qt.ArrowCursor
+            onClicked: control.clicked()
+        }
+
+        Keys.onReturnPressed: if (enabled) clicked()
+        Keys.onSpacePressed: if (enabled) clicked()
     }
 
     component SignalPanel: Rectangle {
@@ -465,29 +471,14 @@ Rectangle {
                             elide: Text.ElideRight
                         }
 
-                        Button {
+                        SignalActionButton {
                             visible: panel.showRowDeleteButtons
                             Layout.preferredWidth: 20
                             Layout.preferredHeight: 20
-                            padding: 0
-                            ToolTip.visible: hovered
-                            ToolTip.text: "Remove signal"
-                            contentItem: Image {
-                                source: "qrc:/resources/icons/cross.svg"
-                                sourceSize.width: 10
-                                sourceSize.height: 10
-                                fillMode: Image.PreserveAspectFit
-                            }
-                            background: Rectangle {
-                                radius: 4
-                                color: "transparent"
-                                border.color: "transparent"
-                            }
-                            MouseArea {
-                                anchors.fill: parent
-                                cursorShape: Qt.PointingHandCursor
-                                onClicked: panel.chartModel.removeSeries(index)
-                            }
+                            iconSource: "qrc:/resources/icons/cross.svg"
+                            tooltip: "Remove signal"
+                            iconSize: 10
+                            onClicked: panel.chartModel.removeSeries(index)
                         }
                     }
                 }
@@ -532,32 +523,54 @@ Rectangle {
         }
     }
 
-    component SignalActionButton: Button {
+    component SignalActionButton: Item {
         id: actionButton
         property url iconSource: ""
         property string tooltip: ""
+        property int iconSize: 12
+        signal clicked()
 
         Layout.preferredWidth: 22
         Layout.preferredHeight: 22
-        padding: 0
-        hoverEnabled: true
+        implicitWidth: 22
+        implicitHeight: 22
+        activeFocusOnTab: enabled
 
-        ToolTip.visible: hovered && tooltip.length > 0
+        Accessible.role: Accessible.Button
+        Accessible.name: tooltip
+
+        ToolTip.visible: mouseArea.containsMouse && tooltip.length > 0
         ToolTip.text: tooltip
         ToolTip.delay: 450
 
-        contentItem: Image {
+        Rectangle {
+            anchors.fill: parent
+            radius: 4
+            color: mouseArea.pressed ? "#eef2f7" : (mouseArea.containsMouse ? "#f7f9fc" : "transparent")
+            border.color: mouseArea.containsMouse ? "#cfd6df" : "transparent"
+            border.width: 1
+        }
+
+        Image {
+            anchors.centerIn: parent
             source: actionButton.iconSource
-            sourceSize.width: 12
-            sourceSize.height: 12
+            sourceSize.width: actionButton.iconSize
+            sourceSize.height: actionButton.iconSize
+            width: actionButton.iconSize
+            height: actionButton.iconSize
             fillMode: Image.PreserveAspectFit
         }
 
-        background: Rectangle {
-            radius: 4
-            color: actionButton.pressed ? "#eef2f7" : (actionButton.hovered ? "#f7f9fc" : "transparent")
-            border.color: actionButton.hovered ? "#cfd6df" : "transparent"
-            border.width: 1
+        MouseArea {
+            id: mouseArea
+            anchors.fill: parent
+            enabled: actionButton.enabled
+            hoverEnabled: true
+            cursorShape: actionButton.enabled ? Qt.PointingHandCursor : Qt.ArrowCursor
+            onClicked: actionButton.clicked()
         }
+
+        Keys.onReturnPressed: if (enabled) clicked()
+        Keys.onSpacePressed: if (enabled) clicked()
     }
 }

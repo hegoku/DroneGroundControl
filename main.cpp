@@ -2,6 +2,7 @@
 #include "src/app/DataChartModel.h"
 #include "src/app/DataChartView.h"
 #include "src/app/ConnectionSession.h"
+#include "src/app/ConnectionSessionBridge.h"
 #include "src/app/Flight.h"
 #include "src/app/RcChannelModel.h"
 
@@ -20,6 +21,7 @@ int main(int argc, char *argv[])
     DataFrameTableModel dataTableModel;
     DataChartModel dataChartModel;
     RcChannelModel rcChannelModel;
+    ConnectionSessionBridge connectionSessionBridge;
 
     QQmlApplicationEngine engine;
     engine.rootContext()->setContextProperty("droneSession", &connectionSession);
@@ -27,6 +29,7 @@ int main(int argc, char *argv[])
     engine.rootContext()->setContextProperty("dataTableModel", &dataTableModel);
     engine.rootContext()->setContextProperty("chartDataModel", &dataChartModel);
     engine.rootContext()->setContextProperty("rcChannelModel", &rcChannelModel);
+    engine.rootContext()->setContextProperty("connectionSessionBridge", &connectionSessionBridge);
 
     const QString benchmarkRenderer = QString::fromLocal8Bit(qgetenv("DGC_CHART_BENCHMARK")).trimmed().toLower();
     QString initialPageSource;

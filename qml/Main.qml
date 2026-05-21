@@ -274,71 +274,79 @@ ApplicationWindow {
 
                 model: ListModel {
                     ListElement { name: "Home"; page: "pages/HomePage.qml"; iconSource: "qrc:/resources/icons/home.svg" }
+                    ListElement { name: "Sensor"; page: "pages/SensorPage.qml"; iconSource: "qrc:/resources/icons/sensor.svg" }
                     ListElement { name: "Parameters"; page: "pages/ParameterPage.qml"; iconSource: "qrc:/resources/icons/basic-setting.svg" }
                     ListElement { name: "Data Frame"; page: "pages/DataFrameTablePage.qml"; iconSource: "qrc:/resources/icons/interface-ui-table-calendar.svg" }
                     ListElement { name: "Data Analysis"; page: "pages/DataChartPage.qml"; iconSource: "qrc:/resources/icons/chart.svg" }
-                    ListElement { name: "Qt Graphs"; page: "pages/DataChartGraphsPage.qml"; iconSource: "qrc:/resources/icons/chart.svg" }
                     ListElement { name: "RC"; page: "pages/RC.qml"; iconSource: "qrc:/resources/icons/game.svg" }
                 }
 
-                delegate: Button {
+                delegate: Item {
                     id: menuItem
                     width: parent.width
                     height: 50
-                    text: name
-                    flat: true
-                    hoverEnabled: true
-                    padding: 0
-                    leftPadding: 18
-                    rightPadding: 10
-                    spacing: 10
-                    display: AbstractButton.TextBesideIcon
-                    palette.buttonText: selected ? "white" : "#CCCCCC"
-                    font.pixelSize: 13
-
-                    icon.source: iconSource
-                    icon.width: 20
-                    icon.height: 20
-                    icon.color: "white"
+                    activeFocusOnTab: true
 
                     property bool selected: ListView.isCurrentItem
+                    readonly property int leftPadding: 18
+                    readonly property int rightPadding: 10
+                    readonly property int iconSize: 20
+                    readonly property int itemSpacing: 10
 
-                    background: Rectangle {
-                        id: bgRect
+                    function activate() {
+                        menuList.currentIndex = index
+                        pageLoader.source = Qt.resolvedUrl(page)
+                    }
+
+                    Accessible.role: Accessible.Button
+                    Accessible.name: name
+
+                    Rectangle {
+                        anchors.fill: parent
                         color: selected ? "#4C8BF5" : "transparent"
                     }
 
-                    contentItem: Row {
-                        spacing: menuItem.spacing
+                    Row {
+                        anchors.left: parent.left
+                        anchors.leftMargin: menuItem.leftPadding
+                        anchors.right: parent.right
+                        anchors.rightMargin: menuItem.rightPadding
+                        anchors.verticalCenter: parent.verticalCenter
+                        height: parent.height
+                        spacing: menuItem.itemSpacing
 
                         IconImage {
-                            source: menuItem.icon.source
-                            color: menuItem.icon.color
-                            sourceSize.width: menuItem.icon.width
-                            sourceSize.height: menuItem.icon.height
-                            width: menuItem.icon.width
-                            height: menuItem.icon.height
+                            source: iconSource
+                            color: "white"
+                            sourceSize.width: menuItem.iconSize
+                            sourceSize.height: menuItem.iconSize
+                            width: menuItem.iconSize
+                            height: menuItem.iconSize
                             anchors.verticalCenter: parent.verticalCenter
                         }
 
                         Text {
-                            text: menuItem.text
-                            color: menuItem.palette.buttonText
-                            font: menuItem.font
+                            text: name
+                            color: selected ? "white" : "#CCCCCC"
+                            font.pixelSize: 13
                             elide: Text.ElideRight
                             verticalAlignment: Text.AlignVCenter
-                            width: menuItem.availableWidth - menuItem.icon.width - parent.spacing
+                            width: parent.width - menuItem.iconSize - parent.spacing
                             height: parent.height
                         }
                     }
 
-                    HoverHandler {
+                    MouseArea {
+                        anchors.fill: parent
                         cursorShape: Qt.PointingHandCursor
+                        onClicked: menuItem.activate()
                     }
 
-                    onClicked: {
-                        menuList.currentIndex = index
-                        pageLoader.source = Qt.resolvedUrl(page)
+                    Keys.onReturnPressed: activate()
+                    Keys.onSpacePressed: activate()
+
+                    HoverHandler {
+                        cursorShape: Qt.PointingHandCursor
                     }
                 }
             }
@@ -357,7 +365,7 @@ ApplicationWindow {
             target: dataTableModel
 
             function onAddSelectedData(functionId, parameterIndex) {
-                menuList.currentIndex = 3
+                menuList.currentIndex = 4
                 pageLoader.source = Qt.resolvedUrl("pages/DataChartPage.qml")
             }
         }

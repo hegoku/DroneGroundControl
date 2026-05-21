@@ -84,7 +84,7 @@ Rectangle {
     Rectangle {
         id: tableFrame
         anchors.fill: parent
-        anchors.margins: 18
+        anchors.margins: 5
         color: "#ffffff"
         border.color: "#c7cdd4"
         border.width: 1

@@ -4,23 +4,24 @@ Rectangle {
     id: panel
 
     property string title: ""
+    property int titleFontPixelSize: 11
+    property int headerHeight: 29
     default property alias content: body.data
 
     implicitHeight: 220
     color: "#ffffff"
     border.color: "#d6dbe2"
     border.width: 1
-    radius: 6
+    radius: 0
+    clip: true
 
     Rectangle {
         id: header
         anchors.top: parent.top
         anchors.left: parent.left
         anchors.right: parent.right
-        height: 40
+        height: panel.headerHeight
         color: "#f3f5f8"
-        border.color: "#dfe3e8"
-        border.width: 1
         radius: panel.radius
 
         Rectangle {
@@ -31,13 +32,21 @@ Rectangle {
             color: parent.color
         }
 
+        Rectangle {
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.bottom: parent.bottom
+            height: 1
+            color: "#dfe3e8"
+        }
+
         Text {
             anchors.left: parent.left
             anchors.leftMargin: 18
             anchors.verticalCenter: parent.verticalCenter
             text: panel.title
             color: "#23272f"
-            font.pixelSize: 16
+            font.pixelSize: panel.titleFontPixelSize
             font.bold: true
         }
     }
