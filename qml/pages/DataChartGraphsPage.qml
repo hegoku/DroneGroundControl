@@ -274,22 +274,22 @@ Rectangle {
 
                     LineSeries {
                         id: series0
-                        width: 1.4
+                        width: 2.0
                     }
 
                     LineSeries {
                         id: series1
-                        width: 1.4
+                        width: 2.0
                     }
 
                     LineSeries {
                         id: series2
-                        width: 1.4
+                        width: 2.0
                     }
 
                     LineSeries {
                         id: series3
-                        width: 1.4
+                        width: 2.0
                     }
 
                     MouseArea {

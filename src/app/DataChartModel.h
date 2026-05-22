@@ -85,7 +85,7 @@ public:
     Q_INVOKABLE void zoomOutFromSampleRange(double lower, double upper);
     Q_INVOKABLE void zoomToChartRange(double xLower, double xUpper, double yLower, double yUpper);
     Q_INVOKABLE void zoomOutFromChartRange(double xLower, double xUpper, double yLower, double yUpper);
-    Q_INVOKABLE void zoomValueRange(double center, double factor);
+    Q_INVOKABLE void zoomValueRange(double anchor, double factor, double anchorRatio = 0.5);
     Q_INVOKABLE QString formatAxisLabel(double value) const;
     Q_INVOKABLE bool saveCsv(const QUrl &fileUrl);
     Q_INVOKABLE bool loadCsv(const QUrl &fileUrl);
@@ -181,6 +181,7 @@ private:
     void moveVisibleRange(double lower);
     void setManualValueRange(double lower, double upper);
     void clearManualValueRange();
+    void zoomSampleRange(double anchor, double factor, double anchorRatio = 0.5);
     void setLastError(const QString &message);
     void updateViewRangeAfterSample(double sample);
     bool displayRange(double *lower, double *upper) const;

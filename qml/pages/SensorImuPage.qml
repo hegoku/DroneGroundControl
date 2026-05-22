@@ -27,6 +27,14 @@ ScrollView {
     readonly property int anotcConfigParGyroOffsetX: 13
     readonly property int anotcConfigParGyroOffsetY: 14
     readonly property int anotcConfigParGyroOffsetZ: 15
+    readonly property var accelDirections: [
+        { "label": "Up", "direction": connectionSessionBridge.accelDirectionUp },
+        { "label": "Forward", "direction": connectionSessionBridge.accelDirectionForward },
+        { "label": "Left", "direction": connectionSessionBridge.accelDirectionLeft },
+        { "label": "Down", "direction": connectionSessionBridge.accelDirectionDown },
+        { "label": "Backward", "direction": connectionSessionBridge.accelDirectionBackward },
+        { "label": "Right", "direction": connectionSessionBridge.accelDirectionRight }
+    ]
     readonly property var imuParameterIds: [
         anotcConfigParImuRotation,
         anotcConfigParGyroAutoCal,
@@ -64,6 +72,16 @@ ScrollView {
     property bool savingParameters: false
     property bool calibratingGyro: false
     property bool refreshingGyroOffsets: false
+    property bool calibratingAccel: false
+    property bool sendingAccelCalibrationCommand: false
+    property bool refreshingAccelCalibration: false
+    property int activeAccelDirection: 0
+    property int accelProgressUp: 0
+    property int accelProgressDown: 0
+    property int accelProgressForward: 0
+    property int accelProgressBackward: 0
+    property int accelProgressLeft: 0
+    property int accelProgressRight: 0
     property int gyroCalibrationProgress: 0
     property string statusMessage: droneSession.isOpen ? "Ready" : "Connect to a drone to load IMU settings"
     property int loadGeneration: 0
@@ -72,6 +90,18 @@ ScrollView {
                                             && !savingParameters
                                             && !calibratingGyro
                                             && !refreshingGyroOffsets
+                                            && !calibratingAccel
+                                            && !sendingAccelCalibrationCommand
+                                            && !refreshingAccelCalibration
+    readonly property bool accelDirectionControlsEnabled: droneSession.isOpen
+                                                          && calibratingAccel
+                                                          && !loadingParameters
+                                                          && !savingParameters
+                                                          && !calibratingGyro
+                                                          && !refreshingGyroOffsets
+                                                          && !sendingAccelCalibrationCommand
+                                                          && !refreshingAccelCalibration
+                                                          && activeAccelDirection === connectionSessionBridge.accelDirectionStart
 
     function clampIndex(value, maximum) {
         var number = Number(value)
@@ -126,7 +156,15 @@ ScrollView {
         }
 
         var commandId = (bytes[0] << 16) | (bytes[1] << 8) | bytes[2]
-        if (commandId !== connectionSessionBridge.commandCalibrateGyro) {
+        if (commandId === connectionSessionBridge.commandCalibrateGyro) {
+            handleGyroCommandResponse(bytes)
+        } else if (commandId === connectionSessionBridge.commandCalibrateAccel) {
+            handleAccelCommandResponse(bytes)
+        }
+    }
+
+    function handleGyroCommandResponse(bytes) {
+        if (bytes.length < 5) {
             return
         }
 
@@ -144,6 +182,42 @@ ScrollView {
         if (!calibratingGyro && wasCalibrating) {
             statusMessage = "Gyro calibration complete"
             refreshGyroOffsets()
+        }
+    }
+
+    function handleAccelCommandResponse(bytes) {
+        if (bytes.length < 6) {
+            return
+        }
+
+        var code = bytes[3]
+        var direction = bytes[4]
+        if (code !== 0) {
+            sendingAccelCalibrationCommand = false
+            activeAccelDirection = connectionSessionBridge.accelDirectionStart
+            if (direction === connectionSessionBridge.accelDirectionStart) {
+                calibratingAccel = false
+            }
+            statusMessage = "Accelerometer calibration failed with code " + code
+            return
+        }
+
+        var progress = Math.max(0, Math.min(100, bytes[5]))
+        if (direction === connectionSessionBridge.accelDirectionStart) {
+            sendingAccelCalibrationCommand = false
+            activeAccelDirection = connectionSessionBridge.accelDirectionStart
+            calibratingAccel = false
+            statusMessage = "Accelerometer calibration complete"
+            refreshAccelCalibrationValues()
+            return
+        }
+
+        setAccelDirectionProgress(direction, progress)
+        statusMessage = progress >= 100
+                        ? accelDirectionLabel(direction) + " data collected"
+                        : "Collecting " + accelDirectionLabel(direction) + " " + progress + "%"
+        if (progress >= 100 && activeAccelDirection === direction) {
+            activeAccelDirection = connectionSessionBridge.accelDirectionStart
         }
     }
 
@@ -184,8 +258,18 @@ ScrollView {
         gyroOffsetZ = parameterText(anotcConfigParGyroOffsetZ, "-")
     }
 
+    function applyAccelCalibrationValues() {
+        accelKX = parameterText(anotcConfigParAccelKX, "-")
+        accelKY = parameterText(anotcConfigParAccelKY, "-")
+        accelKZ = parameterText(anotcConfigParAccelKZ, "-")
+        accelOffsetX = parameterText(anotcConfigParAccelOffsetX, "-")
+        accelOffsetY = parameterText(anotcConfigParAccelOffsetY, "-")
+        accelOffsetZ = parameterText(anotcConfigParAccelOffsetZ, "-")
+    }
+
     function refreshImuParameters() {
-        if (loadingParameters || savingParameters || calibratingGyro || refreshingGyroOffsets) {
+        if (loadingParameters || savingParameters || calibratingGyro || refreshingGyroOffsets
+                || calibratingAccel || sendingAccelCalibrationCommand || refreshingAccelCalibration) {
             return
         }
         if (!droneSession.isOpen) {
@@ -270,6 +354,47 @@ ScrollView {
         statusMessage = "Gyro offset " + parameterId + " refresh failed: " + reason
     }
 
+    function refreshAccelCalibrationValues() {
+        if (refreshingAccelCalibration || !droneSession.isOpen) {
+            return
+        }
+
+        refreshingAccelCalibration = true
+        statusMessage = "Refreshing accelerometer calibration"
+        refreshAccelCalibrationValueAt(0, [anotcConfigParAccelKX,
+                                           anotcConfigParAccelKY,
+                                           anotcConfigParAccelKZ,
+                                           anotcConfigParAccelOffsetX,
+                                           anotcConfigParAccelOffsetY,
+                                           anotcConfigParAccelOffsetZ])
+    }
+
+    function refreshAccelCalibrationValueAt(index, parameterIds) {
+        if (index >= parameterIds.length) {
+            refreshingAccelCalibration = false
+            applyAccelCalibrationValues()
+            statusMessage = "Accelerometer calibration values refreshed"
+            return
+        }
+
+        var parameterId = parameterIds[index]
+        store.refreshParameterInfo(parameterId, function() {
+            store.refreshParameterValue(parameterId, function() {
+                applyAccelCalibrationValues()
+                refreshAccelCalibrationValueAt(index + 1, parameterIds)
+            }, function(error) {
+                finishAccelCalibrationRefreshFailure(parameterId, error.reason)
+            }, "SensorImuPage")
+        }, function(error) {
+            finishAccelCalibrationRefreshFailure(parameterId, error.reason)
+        }, "SensorImuPage")
+    }
+
+    function finishAccelCalibrationRefreshFailure(parameterId, reason) {
+        refreshingAccelCalibration = false
+        statusMessage = "Accelerometer parameter " + parameterId + " refresh failed: " + reason
+    }
+
     function cutoffIsValid(text) {
         var normalized = String(text).trim()
         if (!/^[1-9][0-9]{0,2}$/.test(normalized)) {
@@ -280,7 +405,8 @@ ScrollView {
     }
 
     function cancelChanges() {
-        if (loadingParameters || savingParameters || calibratingGyro || refreshingGyroOffsets) {
+        if (loadingParameters || savingParameters || calibratingGyro || refreshingGyroOffsets
+                || calibratingAccel || sendingAccelCalibrationCommand || refreshingAccelCalibration) {
             return
         }
         restoreLoadedSettings()
@@ -288,7 +414,8 @@ ScrollView {
     }
 
     function saveSettings() {
-        if (loadingParameters || savingParameters || calibratingGyro || refreshingGyroOffsets) {
+        if (loadingParameters || savingParameters || calibratingGyro || refreshingGyroOffsets
+                || calibratingAccel || sendingAccelCalibrationCommand || refreshingAccelCalibration) {
             return
         }
         if (!droneSession.isOpen) {
@@ -316,7 +443,8 @@ ScrollView {
     }
 
     function calibrateGyro() {
-        if (loadingParameters || savingParameters || calibratingGyro || refreshingGyroOffsets) {
+        if (loadingParameters || savingParameters || calibratingGyro || refreshingGyroOffsets
+                || calibratingAccel || sendingAccelCalibrationCommand || refreshingAccelCalibration) {
             return
         }
         if (!droneSession.isOpen) {
@@ -336,6 +464,131 @@ ScrollView {
             calibratingGyro = false
             statusMessage = "Gyro calibration failed: " + error.reason
         })
+    }
+
+    function startAccelCalibration() {
+        if (!controlsEnabled) {
+            return
+        }
+
+        resetAccelProgress()
+        calibratingAccel = true
+        sendAccelCalibrationCommand(connectionSessionBridge.accelDirectionStart,
+                                    "Accelerometer calibration started",
+                                    function() {
+                                        calibratingAccel = false
+                                    })
+    }
+
+    function calibrateAccelDirection(direction) {
+        if (!accelDirectionControlsEnabled) {
+            return
+        }
+
+        activeAccelDirection = direction
+        setAccelDirectionProgress(direction, 0)
+        sendAccelCalibrationCommand(direction,
+                                    "Collecting " + accelDirectionLabel(direction),
+                                    function() {
+                                        activeAccelDirection = connectionSessionBridge.accelDirectionStart
+                                    })
+    }
+
+    function sendAccelCalibrationCommand(direction, successMessage, rollback) {
+        sendingAccelCalibrationCommand = true
+        statusMessage = "Sending accelerometer calibration command"
+        droneSession.sendAnotcCommand(connectionSessionBridge.commandCalibrateAccelCid0,
+                                      connectionSessionBridge.commandCalibrateAccelCid1,
+                                      connectionSessionBridge.commandCalibrateAccelCid2,
+                                      byteToHex(direction),
+                                      function() {
+            sendingAccelCalibrationCommand = false
+            statusMessage = successMessage
+        }, function(error) {
+            sendingAccelCalibrationCommand = false
+            if (rollback) {
+                rollback()
+            }
+            statusMessage = "Accelerometer calibration failed: " + error.reason
+        })
+    }
+
+    function byteToHex(value) {
+        var hex = (Number(value) & 0xff).toString(16).toUpperCase()
+        return hex.length < 2 ? "0" + hex : hex
+    }
+
+    function resetAccelProgress() {
+        accelProgressUp = 0
+        accelProgressDown = 0
+        accelProgressForward = 0
+        accelProgressBackward = 0
+        accelProgressLeft = 0
+        accelProgressRight = 0
+        activeAccelDirection = connectionSessionBridge.accelDirectionStart
+    }
+
+    function accelDirectionLabel(direction) {
+        switch (direction) {
+        case connectionSessionBridge.accelDirectionUp:
+            return "Up"
+        case connectionSessionBridge.accelDirectionDown:
+            return "Down"
+        case connectionSessionBridge.accelDirectionForward:
+            return "Forward"
+        case connectionSessionBridge.accelDirectionBackward:
+            return "Backward"
+        case connectionSessionBridge.accelDirectionLeft:
+            return "Left"
+        case connectionSessionBridge.accelDirectionRight:
+            return "Right"
+        default:
+            return "Accelerometer"
+        }
+    }
+
+    function accelDirectionProgress(direction) {
+        switch (direction) {
+        case connectionSessionBridge.accelDirectionUp:
+            return accelProgressUp
+        case connectionSessionBridge.accelDirectionDown:
+            return accelProgressDown
+        case connectionSessionBridge.accelDirectionForward:
+            return accelProgressForward
+        case connectionSessionBridge.accelDirectionBackward:
+            return accelProgressBackward
+        case connectionSessionBridge.accelDirectionLeft:
+            return accelProgressLeft
+        case connectionSessionBridge.accelDirectionRight:
+            return accelProgressRight
+        default:
+            return 0
+        }
+    }
+
+    function setAccelDirectionProgress(direction, progress) {
+        switch (direction) {
+        case connectionSessionBridge.accelDirectionUp:
+            accelProgressUp = progress
+            break
+        case connectionSessionBridge.accelDirectionDown:
+            accelProgressDown = progress
+            break
+        case connectionSessionBridge.accelDirectionForward:
+            accelProgressForward = progress
+            break
+        case connectionSessionBridge.accelDirectionBackward:
+            accelProgressBackward = progress
+            break
+        case connectionSessionBridge.accelDirectionLeft:
+            accelProgressLeft = progress
+            break
+        case connectionSessionBridge.accelDirectionRight:
+            accelProgressRight = progress
+            break
+        default:
+            break
+        }
     }
 
     function writeSettingAt(index, writes) {
@@ -386,6 +639,10 @@ ScrollView {
                 root.savingParameters = false
                 root.calibratingGyro = false
                 root.refreshingGyroOffsets = false
+                root.calibratingAccel = false
+                root.sendingAccelCalibrationCommand = false
+                root.refreshingAccelCalibration = false
+                root.resetAccelProgress()
                 root.gyroCalibrationProgress = 0
                 root.statusMessage = "Connect to a drone to load IMU settings"
             }
@@ -522,10 +779,7 @@ ScrollView {
                     StyledButton {
                         text: root.calibratingGyro ? root.gyroCalibrationProgress + "%" : "Calibrate"
                         styleName: "primary-button"
-                        enabled: droneSession.isOpen
-                                 && !root.loadingParameters
-                                 && !root.savingParameters
-                                 && !root.refreshingGyroOffsets
+                        enabled: root.controlsEnabled || root.calibratingGyro
                         interactive: root.controlsEnabled
                         progressEnabled: root.calibratingGyro
                         progressFrom: 0
@@ -570,12 +824,12 @@ ScrollView {
                         rowSpacing: 10
 
                         Repeater {
-                            model: ["Up", "Forward", "Left", "Down", "Backward", "Right"]
+                            model: root.accelDirections
 
                             delegate: ColumnLayout {
                                 id: directionControl
 
-                                required property string modelData
+                                required property var modelData
 
                                 Layout.fillWidth: true
                                 spacing: 6
@@ -583,27 +837,31 @@ ScrollView {
                                 StyledProgressBar {
                                     Layout.fillWidth: true
                                     Layout.preferredHeight: 6
-                                    value: 0.6
+                                    from: 0
+                                    to: 100
+                                    value: root.accelDirectionProgress(directionControl.modelData.direction)
                                     progressColor: "#2458f2"
-                                    enabled: root.controlsEnabled
+                                    enabled: droneSession.isOpen && root.calibratingAccel
                                 }
 
                                 StyledButton {
-                                    text: directionControl.modelData
+                                    text: directionControl.modelData.label
                                     styleName: "cancel-button"
-                                    enabled: root.controlsEnabled
+                                    enabled: root.accelDirectionControlsEnabled
                                     Layout.fillWidth: true
+                                    onClicked: root.calibrateAccelDirection(directionControl.modelData.direction)
                                 }
                             }
                         }
                     }
 
                     StyledButton {
-                        text: "Calibrate"
+                        text: root.calibratingAccel ? "Calibrating" : "Calibrate"
                         styleName: "primary-button"
                         enabled: root.controlsEnabled
                         Layout.fillWidth: true
                         Layout.preferredHeight: 24
+                        onClicked: root.startAccelCalibration()
                     }
                 }
             }

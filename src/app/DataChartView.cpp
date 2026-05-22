@@ -12,7 +12,7 @@
 #include <utility>
 
 namespace {
-constexpr double WheelZoomInFactor = 0.95;
+constexpr double WheelZoomInFactor = 0.98;
 constexpr double WheelZoomOutFactor = 1.0 / WheelZoomInFactor;
 }
 
@@ -128,7 +128,7 @@ void DataChartView::paint(QPainter *painter)
             continue;
         }
 
-        QPen seriesPen(series.color, 1.4);
+        QPen seriesPen(series.color, 2.0);
         seriesPen.setCosmetic(true);
         painter->setPen(seriesPen);
 
@@ -300,20 +300,19 @@ void DataChartView::wheelEvent(QWheelEvent *event)
         return;
     }
 
-    double xLower = 0.0;
-    double xUpper = 1.0;
-    double yLower = -1.0;
-    double yUpper = 1.0;
-    m_model->displayRange(&xLower, &xUpper);
-    m_model->valueRange(xLower, xUpper, &yLower, &yUpper);
-    const double valueCenter = (yLower + yUpper) * 0.5;
+    const QPointF cursor = clampToPlot(event->position());
+    const QRectF rect = plotRect();
+    const double xRatio = (cursor.x() - rect.left()) / std::max(1.0, rect.width());
+    const double yRatio = (rect.bottom() - cursor.y()) / std::max(1.0, rect.height());
+    const double sampleAnchor = sampleAtPlotX(cursor.x());
+    const double valueAnchor = valueAtPlotY(cursor.y());
 
     if (event->angleDelta().y() > 0) {
-        m_model->zoomIn();
-        m_model->zoomValueRange(valueCenter, WheelZoomInFactor);
+        m_model->zoomValueRange(valueAnchor, WheelZoomInFactor, yRatio);
+        m_model->zoomSampleRange(sampleAnchor, WheelZoomInFactor, xRatio);
     } else if (event->angleDelta().y() < 0) {
-        m_model->zoomOut();
-        m_model->zoomValueRange(valueCenter, WheelZoomOutFactor);
+        m_model->zoomValueRange(valueAnchor, WheelZoomOutFactor, yRatio);
+        m_model->zoomSampleRange(sampleAnchor, WheelZoomOutFactor, xRatio);
     }
     event->accept();
 }

@@ -20,7 +20,7 @@ namespace {
 constexpr int ChartUpdateIntervalMs = 33;
 constexpr int MinimumMaxSamples = 1000;
 constexpr int MaximumMaxSamples = 2000000;
-constexpr double ZoomInFactor = 0.95;
+constexpr double ZoomInFactor = 0.98;
 constexpr double ZoomOutFactor = 1.0 / ZoomInFactor;
 }
 
@@ -368,18 +368,12 @@ void DataChartModel::showFullChart()
 
 void DataChartModel::zoomIn()
 {
-    if (m_autoScroll) {
-        setAutoScroll(false);
-    }
-    setVisibleSampleSpan(m_visibleSampleSpan * ZoomInFactor);
+    zoomSampleRange((m_viewLower + m_viewUpper) * 0.5, ZoomInFactor, 0.5);
 }
 
 void DataChartModel::zoomOut()
 {
-    if (m_autoScroll) {
-        setAutoScroll(false);
-    }
-    setVisibleSampleSpan(m_visibleSampleSpan * ZoomOutFactor);
+    zoomSampleRange((m_viewLower + m_viewUpper) * 0.5, ZoomOutFactor, 0.5);
 }
 
 void DataChartModel::panByPixels(double pixelDelta, double pixelWidth)
@@ -537,9 +531,9 @@ void DataChartModel::zoomOutFromChartRange(double xLower, double xUpper, double 
     setManualValueRange(yCenter - newYSpan * 0.5, yCenter + newYSpan * 0.5);
 }
 
-void DataChartModel::zoomValueRange(double center, double factor)
+void DataChartModel::zoomValueRange(double anchor, double factor, double anchorRatio)
 {
-    if (!std::isfinite(center) || !std::isfinite(factor) || factor <= 0.0) {
+    if (!std::isfinite(anchor) || !std::isfinite(factor) || !std::isfinite(anchorRatio) || factor <= 0.0) {
         return;
     }
 
@@ -552,7 +546,9 @@ void DataChartModel::zoomValueRange(double center, double factor)
     valueRange(m_viewLower, m_viewUpper, &currentLower, &currentUpper);
     const double currentSpan = std::max(1e-9, currentUpper - currentLower);
     const double boundedSpan = std::clamp(currentSpan * factor, 1e-9, 1e12);
-    setManualValueRange(center - boundedSpan * 0.5, center + boundedSpan * 0.5);
+    const double ratio = std::clamp(anchorRatio, 0.0, 1.0);
+    const double lower = anchor - boundedSpan * ratio;
+    setManualValueRange(lower, lower + boundedSpan);
 }
 
 QString DataChartModel::formatAxisLabel(double value) const
@@ -1153,6 +1149,25 @@ void DataChartModel::clearManualValueRange()
     }
 
     m_manualValueRange = false;
+}
+
+void DataChartModel::zoomSampleRange(double anchor, double factor, double anchorRatio)
+{
+    if (!std::isfinite(anchor) || !std::isfinite(factor) || !std::isfinite(anchorRatio) || factor <= 0.0) {
+        return;
+    }
+
+    if (m_autoScroll) {
+        setAutoScroll(false);
+    }
+
+    const double boundedSpan = clampedVisibleSampleSpan(m_visibleSampleSpan * factor);
+    if (!qFuzzyCompare(m_visibleSampleSpan, boundedSpan)) {
+        m_visibleSampleSpan = boundedSpan;
+        emit visibleSampleSpanChanged();
+    }
+    const double ratio = std::clamp(anchorRatio, 0.0, 1.0);
+    moveVisibleRange(anchor - boundedSpan * ratio);
 }
 
 void DataChartModel::setLastError(const QString &message)

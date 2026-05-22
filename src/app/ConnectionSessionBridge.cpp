@@ -35,6 +35,61 @@ int ConnectionSessionBridge::commandCalibrateGyroCid2() const
     return cid2(ANOTC_CMD_CALIBRATE_GYRO);
 }
 
+int ConnectionSessionBridge::commandCalibrateAccel() const
+{
+    return static_cast<int>(ANOTC_CMD_CALIBRATE_ACCEL);
+}
+
+int ConnectionSessionBridge::commandCalibrateAccelCid0() const
+{
+    return cid0(ANOTC_CMD_CALIBRATE_ACCEL);
+}
+
+int ConnectionSessionBridge::commandCalibrateAccelCid1() const
+{
+    return cid1(ANOTC_CMD_CALIBRATE_ACCEL);
+}
+
+int ConnectionSessionBridge::commandCalibrateAccelCid2() const
+{
+    return cid2(ANOTC_CMD_CALIBRATE_ACCEL);
+}
+
+int ConnectionSessionBridge::accelDirectionStart() const
+{
+    return 0;
+}
+
+int ConnectionSessionBridge::accelDirectionUp() const
+{
+    return 'U';
+}
+
+int ConnectionSessionBridge::accelDirectionDown() const
+{
+    return 'D';
+}
+
+int ConnectionSessionBridge::accelDirectionForward() const
+{
+    return 'F';
+}
+
+int ConnectionSessionBridge::accelDirectionBackward() const
+{
+    return 'B';
+}
+
+int ConnectionSessionBridge::accelDirectionLeft() const
+{
+    return 'L';
+}
+
+int ConnectionSessionBridge::accelDirectionRight() const
+{
+    return 'R';
+}
+
 int ConnectionSessionBridge::commandRebootCid0() const
 {
     return cid0(ANOTC_CMD_REBOOT);
