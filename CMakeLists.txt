@@ -84,6 +84,7 @@ qt_add_qml_module(appDroneGroundControl
         qml/pages/DataChartGraphsPage.qml
         qml/pages/DataFrameTablePage.qml
         qml/pages/RC.qml
+        qml/pages/MixerPage.qml
         qml/components/Battery.qml
         qml/components/SensorStatus.qml
         qml/components/ConnectionButton.qml

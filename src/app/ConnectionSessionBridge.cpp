@@ -105,6 +105,56 @@ int ConnectionSessionBridge::commandRebootCid2() const
     return cid2(ANOTC_CMD_REBOOT);
 }
 
+int ConnectionSessionBridge::commandToggleMotorTestCid0() const
+{
+    return cid0(ANOTC_CMD_TOGGLE_MOTOR_TEST_STATUS);
+}
+
+int ConnectionSessionBridge::commandToggleMotorTestCid1() const
+{
+    return cid1(ANOTC_CMD_TOGGLE_MOTOR_TEST_STATUS);
+}
+
+int ConnectionSessionBridge::commandToggleMotorTestCid2() const
+{
+    return cid2(ANOTC_CMD_TOGGLE_MOTOR_TEST_STATUS);
+}
+
+int ConnectionSessionBridge::commandMotorTestThrottleCid0() const
+{
+    return cid0(ANOTC_CMD_MOTOR_TEST_THROTTLE);
+}
+
+int ConnectionSessionBridge::commandMotorTestThrottleCid1() const
+{
+    return cid1(ANOTC_CMD_MOTOR_TEST_THROTTLE);
+}
+
+int ConnectionSessionBridge::commandMotorTestThrottleCid2() const
+{
+    return cid2(ANOTC_CMD_MOTOR_TEST_THROTTLE);
+}
+
+int ConnectionSessionBridge::framePwm() const
+{
+    return ANOTC_FRAME_PWM;
+}
+
+int ConnectionSessionBridge::frameCustomSystemInfo() const
+{
+    return ANOTC_FRAME_CUSTOM_SYSTEM_INFO;
+}
+
+int ConnectionSessionBridge::frameCustomPid() const
+{
+    return ANOTC_FRAME_CUSTOM_PID;
+}
+
+int ConnectionSessionBridge::flightStatusMotorTest() const
+{
+    return 13;
+}
+
 QVariantList ConnectionSessionBridge::commandFramePayloads(const QVector<_un_anotc_v8_frame> &frames) const
 {
     QVariantList payloads;

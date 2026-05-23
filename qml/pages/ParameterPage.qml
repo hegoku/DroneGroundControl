@@ -89,14 +89,43 @@ Rectangle {
         columnWidths = widths
     }
 
-    function valueText(value, valueHex, hasValue) {
+    function trimFormattedNumber(text) {
+        var exponentIndex = Math.max(text.indexOf("e"), text.indexOf("E"))
+        if (exponentIndex >= 0) {
+            var mantissa = text.slice(0, exponentIndex)
+            var exponent = text.slice(exponentIndex + 1)
+            mantissa = mantissa.replace(/(\.\d*?)0+$/, "$1").replace(/\.$/, "")
+            exponent = exponent.replace(/^\+/, "").replace(/^(-?)0+(\d)/, "$1$2")
+            return mantissa + "e" + exponent
+        }
+
+        return text.replace(/(\.\d*?)0+$/, "$1").replace(/\.$/, "")
+    }
+
+    function numericValueText(value, typeName) {
+        if (typeof value !== "number") {
+            return String(value)
+        }
+        if (!isFinite(value)) {
+            return String(value)
+        }
+        if (typeName === "Float") {
+            return trimFormattedNumber(value.toPrecision(7))
+        }
+        if (typeName === "Double") {
+            return trimFormattedNumber(value.toPrecision(15))
+        }
+        return String(value)
+    }
+
+    function valueText(value, valueHex, hasValue, typeName) {
         if (!hasValue) {
             return ""
         }
         if (value === undefined || value === null || String(value).length === 0) {
             return valueHex
         }
-        return String(value)
+        return numericValueText(value, typeName)
     }
 
     function statusColor() {
@@ -425,7 +454,7 @@ Rectangle {
                                 id: valueEditor
                                 anchors.fill: parent
                                 anchors.margins: 4
-                                text: root.valueText(model.value, model.valueHex, model.hasValue)
+                                text: root.valueText(model.value, model.valueHex, model.hasValue, model.typeName)
                                 enabled: model.editable && model.hasDefinition && model.hasValue && !reading && !saving
                                 selectByMouse: true
                                 font.pixelSize: 14
@@ -437,7 +466,7 @@ Rectangle {
                                         return
                                     }
 
-                                    var currentText = root.valueText(model.value, model.valueHex, model.hasValue)
+                                    var currentText = root.valueText(model.value, model.valueHex, model.hasValue, model.typeName)
                                     if (text !== currentText) {
                                         root.store.setParameterValueText(model.parameterId, text, "ParameterPage")
                                     }

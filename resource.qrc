@@ -24,6 +24,7 @@
         <file>resources/icons/interface-ui-table-calendar.svg</file>
         <file>resources/icons/chart.svg</file>
         <file>resources/icons/game.svg</file>
+        <file>resources/icons/drone-mixer.svg</file>
         <file>resources/icons/sensor.svg</file>
         <file>resources/icons/app-master.png</file>
         <file>resources/DataFrameDefination.json</file>
@@ -34,6 +35,7 @@
         <file>qml/pages/ParameterPage.qml</file>
         <file>qml/pages/DataFrameTablePage.qml</file>
         <file>qml/pages/RC.qml</file>
+        <file>qml/pages/MixerPage.qml</file>
         <file>qml/components/StyledButton.qml</file>
         <file>qml/components/StyledPanel.qml</file>
         <file>qml/components/StyledSelect.qml</file>

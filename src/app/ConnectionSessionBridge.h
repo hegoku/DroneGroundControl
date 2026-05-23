@@ -27,6 +27,16 @@ class ConnectionSessionBridge : public QObject
     Q_PROPERTY(int commandRebootCid0 READ commandRebootCid0 CONSTANT)
     Q_PROPERTY(int commandRebootCid1 READ commandRebootCid1 CONSTANT)
     Q_PROPERTY(int commandRebootCid2 READ commandRebootCid2 CONSTANT)
+    Q_PROPERTY(int commandToggleMotorTestCid0 READ commandToggleMotorTestCid0 CONSTANT)
+    Q_PROPERTY(int commandToggleMotorTestCid1 READ commandToggleMotorTestCid1 CONSTANT)
+    Q_PROPERTY(int commandToggleMotorTestCid2 READ commandToggleMotorTestCid2 CONSTANT)
+    Q_PROPERTY(int commandMotorTestThrottleCid0 READ commandMotorTestThrottleCid0 CONSTANT)
+    Q_PROPERTY(int commandMotorTestThrottleCid1 READ commandMotorTestThrottleCid1 CONSTANT)
+    Q_PROPERTY(int commandMotorTestThrottleCid2 READ commandMotorTestThrottleCid2 CONSTANT)
+    Q_PROPERTY(int framePwm READ framePwm CONSTANT)
+    Q_PROPERTY(int frameCustomSystemInfo READ frameCustomSystemInfo CONSTANT)
+    Q_PROPERTY(int frameCustomPid READ frameCustomPid CONSTANT)
+    Q_PROPERTY(int flightStatusMotorTest READ flightStatusMotorTest CONSTANT)
 
 public:
     explicit ConnectionSessionBridge(QObject *parent = nullptr);
@@ -50,6 +60,16 @@ public:
     int commandRebootCid0() const;
     int commandRebootCid1() const;
     int commandRebootCid2() const;
+    int commandToggleMotorTestCid0() const;
+    int commandToggleMotorTestCid1() const;
+    int commandToggleMotorTestCid2() const;
+    int commandMotorTestThrottleCid0() const;
+    int commandMotorTestThrottleCid1() const;
+    int commandMotorTestThrottleCid2() const;
+    int framePwm() const;
+    int frameCustomSystemInfo() const;
+    int frameCustomPid() const;
+    int flightStatusMotorTest() const;
 
     Q_INVOKABLE QVariantList commandFramePayloads(const QVector<_un_anotc_v8_frame> &frames) const;
 

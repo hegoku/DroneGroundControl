@@ -279,6 +279,7 @@ ApplicationWindow {
                     ListElement { name: "Data Frame"; page: "pages/DataFrameTablePage.qml"; iconSource: "qrc:/resources/icons/interface-ui-table-calendar.svg" }
                     ListElement { name: "Data Analysis"; page: "pages/DataChartPage.qml"; iconSource: "qrc:/resources/icons/chart.svg" }
                     ListElement { name: "RC"; page: "pages/RC.qml"; iconSource: "qrc:/resources/icons/game.svg" }
+                    ListElement { name: "Mixer"; page: "pages/MixerPage.qml"; iconSource: "qrc:/resources/icons/drone-mixer.svg" }
                 }
 
                 delegate: Item {
