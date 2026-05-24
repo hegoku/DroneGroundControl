@@ -25,6 +25,20 @@ ApplicationWindow {
             property string connectionMode: "serial"
             property bool connectionBusy: false
 
+            function formatRate(bytesPerSecond) {
+                var value = Number(bytesPerSecond)
+                if (!isFinite(value) || value < 0) {
+                    value = 0
+                }
+                if (value >= 1000000) {
+                    return (value / 1000000).toFixed(1) + "M/s"
+                }
+                if (value >= 1000) {
+                    return (value / 1000).toFixed(1) + "k/s"
+                }
+                return Math.round(value) + "/s"
+            }
+
             function disconnectAfterDeviceInfo() {
                 if (connectionBusy)
                     return
@@ -163,7 +177,35 @@ ApplicationWindow {
                 }
             }
 
+            Item {
+                id: transferRatePanel
+                anchors.left: connectionControls.right
+                anchors.leftMargin: 18
+                anchors.verticalCenter: parent.verticalCenter
+                width: 82
+                height: 40
+
+                Column {
+                    anchors.left: parent.left
+                    anchors.verticalCenter: parent.verticalCenter
+                    spacing: 2
+
+                    TransferRateRow {
+                        iconSource: "qrc:/resources/icons/arrow-down.svg"
+                        rate: droneSession.receiveBytesPerSecond
+                        rateColor: "#61cf6f"
+                    }
+
+                    TransferRateRow {
+                        iconSource: "qrc:/resources/icons/arrow-up.svg"
+                        rate: droneSession.sendBytesPerSecond
+                        rateColor: "#ff4d67"
+                    }
+                }
+            }
+
             Row {
+                id: statusControls
                 anchors.right: parent.right
                 height: parent.height
                 Battery {
@@ -207,6 +249,37 @@ ApplicationWindow {
                     height: parent.height
                     width: parent.height
                     anchors.verticalCenter: parent.verticalCenter
+                }
+            }
+
+            component TransferRateRow: Row {
+                property string iconSource: ""
+                property real rate: 0
+                property color rateColor: "#ffffff"
+
+                width: transferRatePanel.width
+                height: 18
+                spacing: 4
+
+                IconImage {
+                    source: iconSource
+                    color: rateColor
+                    sourceSize.width: 14
+                    sourceSize.height: 14
+                    width: 14
+                    height: 14
+                    anchors.verticalCenter: parent.verticalCenter
+                }
+
+                Text {
+                    text: topBar.formatRate(rate)
+                    color: rateColor
+                    font.pixelSize: 10
+                    font.bold: true
+                    width: parent.width - 18
+                    height: parent.height
+                    verticalAlignment: Text.AlignVCenter
+                    elide: Text.ElideRight
                 }
             }
 

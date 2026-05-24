@@ -7,6 +7,9 @@
 UdpTransport::UdpTransport(QObject *parent)
     : ITransport(parent)
 {
+    m_statsTimer = new QTimer(this);
+    m_statsTimer->setInterval(1000);
+    connect(m_statsTimer, &QTimer::timeout, this, &UdpTransport::maybeEmitPerformanceStats);
 }
 
 bool UdpTransport::open(const ConnectionConfig &config)
@@ -41,6 +44,7 @@ bool UdpTransport::open(const ConnectionConfig &config)
     m_remoteAddress = remoteAddress;
     m_remotePort = config.udpRemotePort;
     setState(State::Open);
+    m_statsTimer->start();
     return true;
 }
 
@@ -52,6 +56,9 @@ void UdpTransport::close()
     }
 
     setState(State::Closed);
+    if (m_statsTimer) {
+        m_statsTimer->stop();
+    }
 }
 
 void UdpTransport::send(const QByteArray &data)
@@ -64,7 +71,10 @@ void UdpTransport::send(const QByteArray &data)
     const qint64 bytesWritten = m_socket->writeDatagram(data, m_remoteAddress, m_remotePort);
     if (bytesWritten < 0) {
         emit errorOccurred(m_socket->errorString());
+        return;
     }
+    m_totalBytesSent += static_cast<quint64>(bytesWritten);
+    maybeEmitPerformanceStats();
 }
 
 bool UdpTransport::isOpen() const
@@ -109,9 +119,11 @@ void UdpTransport::resetPerformanceCounters()
     m_performanceTimer.restart();
     m_lastStatsElapsedMs = 0;
     m_totalBytesReceived = 0;
+    m_totalBytesSent = 0;
     m_totalFeedBytesCalls = 0;
     m_totalFramesParsed = 0;
     m_lastStatsBytesReceived = 0;
+    m_lastStatsBytesSent = 0;
     m_lastStatsFeedBytesCalls = 0;
     m_lastStatsFramesParsed = 0;
 }
@@ -132,12 +144,15 @@ void UdpTransport::maybeEmitPerformanceStats()
     const double intervalSeconds = static_cast<double>(intervalMs) / 1000.0;
     TransportPerformanceStats stats;
     stats.totalBytesReceived = m_totalBytesReceived;
+    stats.totalBytesSent = m_totalBytesSent;
     stats.totalFeedBytesCalls = m_totalFeedBytesCalls;
     stats.totalFramesParsed = m_totalFramesParsed;
     stats.totalChecksumErrors = m_protocol ? m_protocol->errorCount() : 0;
     stats.totalExceededLengthErrors = m_protocol ? m_protocol->exceededLengthCount() : 0;
     stats.bytesPerSecond = static_cast<double>(m_totalBytesReceived - m_lastStatsBytesReceived)
                            / intervalSeconds;
+    stats.bytesSentPerSecond = static_cast<double>(m_totalBytesSent - m_lastStatsBytesSent)
+                               / intervalSeconds;
     stats.feedBytesCallsPerSecond = static_cast<double>(m_totalFeedBytesCalls - m_lastStatsFeedBytesCalls)
                                     / intervalSeconds;
     stats.framesParsedPerSecond = static_cast<double>(m_totalFramesParsed - m_lastStatsFramesParsed)
@@ -145,6 +160,7 @@ void UdpTransport::maybeEmitPerformanceStats()
 
     m_lastStatsElapsedMs = elapsedMs;
     m_lastStatsBytesReceived = m_totalBytesReceived;
+    m_lastStatsBytesSent = m_totalBytesSent;
     m_lastStatsFeedBytesCalls = m_totalFeedBytesCalls;
     m_lastStatsFramesParsed = m_totalFramesParsed;
 

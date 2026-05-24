@@ -123,6 +123,16 @@ ParameterStore *ConnectionSession::parameterStore()
     return &m_parameterStore;
 }
 
+double ConnectionSession::receiveBytesPerSecond() const
+{
+    return m_receiveBytesPerSecond;
+}
+
+double ConnectionSession::sendBytesPerSecond() const
+{
+    return m_sendBytesPerSecond;
+}
+
 QStringList ConnectionSession::availableSerialPorts() const
 {
     QStringList ports;
@@ -235,6 +245,7 @@ void ConnectionSession::close()
 {
     m_requestManager.cancelAll(QStringLiteral("Connection closed."));
     resetConnectionObjects();
+    resetTransportRates();
 }
 
 void ConnectionSession::closeWithDisconnectCommand()
@@ -261,6 +272,7 @@ void ConnectionSession::closeWithDisconnectCommand()
 
     m_transport.clear();
     m_protocol.reset();
+    resetTransportRates();
 }
 
 void ConnectionSession::setTransport(ITransport *transport)
@@ -299,9 +311,11 @@ void ConnectionSession::setTransport(ITransport *transport)
     }, Qt::QueuedConnection);
 
     connect(m_transport, &ITransport::performanceStats, this, [this](const TransportPerformanceStats &stats) {
+        setTransportPerformanceStats(stats);
         emit performanceStats(stats);
-        emit log(QStringLiteral("Transport stats: bytes/s=%1 feedBytes/s=%2 parsedFrames/s=%3 totalParsed=%4 checksumErrors=%5 lengthErrors=%6")
+        emit log(QStringLiteral("Transport stats: rxBytes/s=%1 txBytes/s=%2 feedBytes/s=%3 parsedFrames/s=%4 totalParsed=%5 checksumErrors=%6 lengthErrors=%7")
                      .arg(stats.bytesPerSecond, 0, 'f', 0)
+                     .arg(stats.bytesSentPerSecond, 0, 'f', 0)
                      .arg(stats.feedBytesCallsPerSecond, 0, 'f', 0)
                      .arg(stats.framesParsedPerSecond, 0, 'f', 0)
                      .arg(stats.totalFramesParsed)
@@ -346,6 +360,7 @@ void ConnectionSession::resetConnectionObjects()
     }
 
     m_protocol.reset();
+    resetTransportRates();
 }
 
 void ConnectionSession::setOpen(bool open)
@@ -376,6 +391,42 @@ void ConnectionSession::setLastError(const QString &message)
 
     m_lastError = message;
     emit errorOccurred(m_lastError);
+}
+
+void ConnectionSession::setTransportPerformanceStats(const TransportPerformanceStats &stats)
+{
+    const double receiveBytesPerSecond = stats.bytesPerSecond;
+    const double sendBytesPerSecond = stats.bytesSentPerSecond;
+
+    if (m_receiveBytesPerSecond != receiveBytesPerSecond) {
+        m_receiveBytesPerSecond = receiveBytesPerSecond;
+        emit receiveBytesPerSecondChanged();
+    }
+    if (m_sendBytesPerSecond != sendBytesPerSecond) {
+        m_sendBytesPerSecond = sendBytesPerSecond;
+        emit sendBytesPerSecondChanged();
+    }
+}
+
+void ConnectionSession::resetTransportRates()
+{
+    bool changed = false;
+    if (m_receiveBytesPerSecond != 0.0) {
+        m_receiveBytesPerSecond = 0.0;
+        changed = true;
+    }
+    if (changed) {
+        emit receiveBytesPerSecondChanged();
+    }
+
+    changed = false;
+    if (m_sendBytesPerSecond != 0.0) {
+        m_sendBytesPerSecond = 0.0;
+        changed = true;
+    }
+    if (changed) {
+        emit sendBytesPerSecondChanged();
+    }
 }
 
 void ConnectionSession::sendBytes(const QByteArray &data)

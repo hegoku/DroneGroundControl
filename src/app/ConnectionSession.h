@@ -28,6 +28,8 @@ class ConnectionSession : public QObject
     Q_PROPERTY(QString lastError READ lastError NOTIFY errorOccurred)
     Q_PROPERTY(bool rawByteForwardingEnabled READ rawByteForwardingEnabled WRITE setRawByteForwardingEnabled NOTIFY rawByteForwardingEnabledChanged)
     Q_PROPERTY(ParameterStore *parameterStore READ parameterStore CONSTANT)
+    Q_PROPERTY(double receiveBytesPerSecond READ receiveBytesPerSecond NOTIFY receiveBytesPerSecondChanged)
+    Q_PROPERTY(double sendBytesPerSecond READ sendBytesPerSecond NOTIFY sendBytesPerSecondChanged)
 
 public:
     using RequestSuccessHandler = std::function<void(const QVariantMap &response)>;
@@ -42,6 +44,8 @@ public:
     bool rawByteForwardingEnabled() const;
     void setRawByteForwardingEnabled(bool enabled);
     ParameterStore *parameterStore();
+    double receiveBytesPerSecond() const;
+    double sendBytesPerSecond() const;
 
     Q_INVOKABLE QStringList availableSerialPorts() const;
     Q_INVOKABLE bool openSerial(const QString &portName,
@@ -97,6 +101,8 @@ signals:
     void isOpenChanged();
     void stateChanged();
     void rawByteForwardingEnabledChanged();
+    void receiveBytesPerSecondChanged();
+    void sendBytesPerSecondChanged();
     void errorOccurred(QString message);
     void bytesReceived(QByteArray data);
     void telemetryFramesReceived(QVector<_un_anotc_v8_frame> frames);
@@ -133,6 +139,8 @@ private:
     void setOpen(bool open);
     void setStateString(const QString &state);
     void setLastError(const QString &message);
+    void setTransportPerformanceStats(const TransportPerformanceStats &stats);
+    void resetTransportRates();
     quint64 submitRequest(const AnotcRequest &request);
     quint64 submitRequest(const AnotcRequest &request,
                           const QJSValue &onSuccess,
@@ -182,6 +190,8 @@ private:
     QHash<quint64, JsCallbacks> m_sequenceCallbacks;
     bool m_isOpen = false;
     bool m_rawByteForwardingEnabled = false;
+    double m_receiveBytesPerSecond = 0.0;
+    double m_sendBytesPerSecond = 0.0;
     QString m_state = QStringLiteral("closed");
     QString m_lastError;
 };

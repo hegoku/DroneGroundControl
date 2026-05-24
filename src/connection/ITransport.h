@@ -14,11 +14,13 @@ class IProtocolSession;
 struct TransportPerformanceStats
 {
     quint64 totalBytesReceived = 0;
+    quint64 totalBytesSent = 0;
     quint64 totalFeedBytesCalls = 0;
     quint64 totalFramesParsed = 0;
     quint64 totalChecksumErrors = 0;
     quint64 totalExceededLengthErrors = 0;
     double bytesPerSecond = 0.0;
+    double bytesSentPerSecond = 0.0;
     double feedBytesCallsPerSecond = 0.0;
     double framesParsedPerSecond = 0.0;
 };

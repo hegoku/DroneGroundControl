@@ -19,6 +19,8 @@
         <file>resources/icons/trash.svg</file>
         <file>resources/icons/chevron-down.svg</file>
         <file>resources/icons/chevron-right.svg</file>
+        <file>resources/icons/arrow-up.svg</file>
+        <file>resources/icons/arrow-down.svg</file>
         <file>resources/icons/home.svg</file>
         <file>resources/icons/basic-setting.svg</file>
         <file>resources/icons/interface-ui-table-calendar.svg</file>
