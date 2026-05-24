@@ -104,6 +104,7 @@ signals:
     void receiveBytesPerSecondChanged();
     void sendBytesPerSecondChanged();
     void errorOccurred(QString message);
+    void transportErrorOccurred(QString message);
     void bytesReceived(QByteArray data);
     void telemetryFramesReceived(QVector<_un_anotc_v8_frame> frames);
     void parameterFramesReceived(QVector<_un_anotc_v8_frame> frames);

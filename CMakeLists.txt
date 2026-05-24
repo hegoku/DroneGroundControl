@@ -95,6 +95,7 @@ qt_add_qml_module(appDroneGroundControl
         qml/components/StyledSelect.qml
         qml/components/StyledProgressBar.qml
         qml/components/StyledTab.qml
+        qml/components/MessageBox.qml
     RESOURCES resource.qrc
     SOURCES src/protocol/AnotcConfigFrame.h
     SOURCES src/protocol/AnotcCmdFrame.h

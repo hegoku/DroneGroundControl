@@ -330,6 +330,7 @@ void ConnectionSession::setTransport(ITransport *transport)
 
     connect(m_transport, &ITransport::errorOccurred, this, [this](const QString &message) {
         setLastError(message);
+        emit transportErrorOccurred(message);
     }, Qt::QueuedConnection);
 }
 

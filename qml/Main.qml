@@ -291,6 +291,12 @@ ApplicationWindow {
                     console.warn("Connection error:", message)
                 }
 
+                function onTransportErrorOccurred(message) {
+                    topBar.connectionBusy = false
+                    connectionMessage.show("Connection Error", message)
+                    console.warn("Transport error:", message)
+                }
+
                 function onLog(message) {
                     console.log("Connection:", message)
                 }
@@ -443,6 +449,10 @@ ApplicationWindow {
                 pageLoader.source = Qt.resolvedUrl("pages/DataChartPage.qml")
             }
         }
+    }
+
+    MessageBox {
+        id: connectionMessage
     }
 
 }
