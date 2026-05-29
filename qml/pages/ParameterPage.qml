@@ -15,6 +15,8 @@ Rectangle {
     property int currentParameterId: -1
     property int failedCount: 0
     property string statusMessage: "Ready"
+    property string searchDraftText: ""
+    property string searchQuery: ""
     property var columnWidths: [80, 210, 150, 110, 110, 320]
     property var minimumColumnWidths: [60, 120, 100, 80, 90, 140]
     property real lastTableWidth: 0
@@ -126,6 +128,33 @@ Rectangle {
             return valueHex
         }
         return numericValueText(value, typeName)
+    }
+
+    function applySearch() {
+        searchQuery = searchDraftText.trim()
+    }
+
+    function searchTokens() {
+        var normalized = searchQuery.trim().toLowerCase()
+        if (normalized.length === 0) {
+            return []
+        }
+        return normalized.split(/\s+/)
+    }
+
+    function parameterMatchesSearch(name) {
+        var tokens = searchTokens()
+        if (tokens.length === 0) {
+            return true
+        }
+
+        var parameterName = String(name || "").toLowerCase()
+        for (var i = 0; i < tokens.length; ++i) {
+            if (parameterName.indexOf(tokens[i]) < 0) {
+                return false
+            }
+        }
+        return true
     }
 
     function statusColor() {
@@ -347,13 +376,77 @@ Rectangle {
                 }
 
                 Text {
-                    width: 460
+                    width: Math.max(180, toolbar.width - searchControls.width - 430)
                     anchors.verticalCenter: parent.verticalCenter
                     text: statusMessage
                     color: "#2b3036"
                     font.pixelSize: 15
                     font.bold: true
                     elide: Text.ElideRight
+                }
+            }
+        }
+
+        Row {
+            id: searchControls
+            anchors.right: parent.right
+            anchors.rightMargin: 5
+            anchors.verticalCenter: parent.verticalCenter
+            height: 32
+
+            Rectangle {
+                width: 280
+                height: parent.height
+                radius: 4
+                color: "#ffffff"
+                border.color: searchInput.activeFocus ? "#4c8bf5" : "#cfd5dd"
+                border.width: 1
+
+                Image {
+                    id: searchIcon
+                    source: "qrc:/resources/icons/search.svg"
+                    width: 15
+                    height: 15
+                    fillMode: Image.PreserveAspectFit
+                    anchors.left: parent.left
+                    anchors.leftMargin: 10
+                    anchors.verticalCenter: parent.verticalCenter
+                }
+
+                TextInput {
+                    id: searchInput
+                    anchors.left: parent.left
+                    anchors.right: parent.right
+                    anchors.verticalCenter: parent.verticalCenter
+                    anchors.leftMargin: 34
+                    anchors.rightMargin: 10
+                    height: parent.height
+                    text: root.searchDraftText
+                    color: "#111827"
+                    selectionColor: "#cfe0ff"
+                    selectedTextColor: "#111827"
+                    font.pixelSize: 14
+                    selectByMouse: true
+                    verticalAlignment: TextInput.AlignVCenter
+
+                    onTextChanged: {
+                        root.searchDraftText = text
+                        root.applySearch()
+                    }
+
+                    Keys.onReturnPressed: root.applySearch()
+                    Keys.onEnterPressed: root.applySearch()
+                }
+
+                Text {
+                    anchors.left: searchInput.left
+                    anchors.right: searchInput.right
+                    anchors.verticalCenter: parent.verticalCenter
+                    text: "Search parameter name"
+                    color: "#8a93a0"
+                    font.pixelSize: 14
+                    elide: Text.ElideRight
+                    visible: searchInput.text.length === 0 && !searchInput.activeFocus
                 }
             }
         }
@@ -415,8 +508,11 @@ Rectangle {
             delegate: Rectangle {
                 id: rowItem
                 width: tableView.width
-                height: 32
+                height: matchesSearch ? 32 : 0
+                visible: matchesSearch
                 color: hoverHandler.hovered ? "#eef4ff" : (index % 2 === 0 ? "#ffffff" : "#fbfcfd")
+
+                readonly property bool matchesSearch: root.parameterMatchesSearch(model.name)
 
                 Row {
                     anchors.fill: parent

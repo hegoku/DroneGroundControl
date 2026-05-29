@@ -17,6 +17,7 @@ Rectangle {
     property bool loadingProtocol: false
     property bool savingProtocol: false
     property string statusMessage: droneSession.isOpen ? "Ready" : "Connect to a drone to edit RC settings"
+    property var simulatorWindow: null
 
     function parseProtocol(hex) {
         var normalized = String(hex || "").replace(/\s+/g, "")
@@ -112,7 +113,22 @@ Rectangle {
         }, "RCPage")
     }
 
+    function openRcSimulator() {
+        if (!simulatorWindow) {
+            simulatorWindow = rcSimulatorComponent.createObject(root)
+        }
+        simulatorWindow.show()
+        simulatorWindow.raise()
+        simulatorWindow.requestActivate()
+    }
+
     Component.onCompleted: refreshProtocol()
+
+    Component {
+        id: rcSimulatorComponent
+
+        RcSimulatorWindow {}
+    }
 
     Connections {
         target: droneSession
@@ -202,6 +218,14 @@ Rectangle {
                         RowLayout {
                             Layout.fillWidth: true
                             spacing: 12
+
+                            StyledButton {
+                                text: "RC Simulator"
+                                styleName: "primary-button"
+                                enabled: true
+                                Layout.preferredWidth: 112
+                                onClicked: root.openRcSimulator()
+                            }
 
                             Item { Layout.fillWidth: true }
 

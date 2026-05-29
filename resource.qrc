@@ -22,6 +22,7 @@
         <file>resources/icons/chevron-right.svg</file>
         <file>resources/icons/arrow-up.svg</file>
         <file>resources/icons/arrow-down.svg</file>
+        <file>resources/icons/search.svg</file>
         <file>resources/icons/home.svg</file>
         <file>resources/icons/basic-setting.svg</file>
         <file>resources/icons/interface-ui-table-calendar.svg</file>
@@ -38,8 +39,10 @@
         <file>qml/pages/ParameterPage.qml</file>
         <file>qml/pages/DataFrameTablePage.qml</file>
         <file>qml/pages/RC.qml</file>
+        <file>qml/pages/RcSimulatorWindow.qml</file>
         <file>qml/pages/MixerPage.qml</file>
         <file>qml/components/StyledButton.qml</file>
+        <file>qml/components/ControlPad.qml</file>
         <file>qml/components/StyledPanel.qml</file>
         <file>qml/components/StyledSelect.qml</file>
         <file>qml/components/StyledProgressBar.qml</file>
