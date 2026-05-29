@@ -1,10 +1,8 @@
 pragma ComponentBehavior: Bound
 
 import QtQuick
-import QtQuick.Controls
 import QtQuick.Layouts
 import QtQuick.Window
-import DroneGroundControl
 import "../components"
 
 Window {
@@ -20,48 +18,83 @@ Window {
 
     readonly property int rcMin: 1000
     readonly property int rcMax: 2000
+    readonly property int rcSendIntervalMs: 10
+    readonly property int pcRcCommandCid0: 0
+    readonly property int pcRcCommandCid1: 0
+    readonly property int pcRcCommandCid2: 6
     readonly property var controllerOptions: ["Mouse", "Gamepad"]
     readonly property var gamepadOptions: ["No gamepad connected"]
     readonly property var modeOptions: ["Ready", "Angle", "Rate"]
     readonly property int controllerGamepadIndex: 1
 
-    property bool controlOpen: true
-    property int controllerIndex: 1
+    property bool controlOpen: false
+    property int controllerIndex: 0
     property int gamepadIndex: 0
-    readonly property int modeIndex: modeIndexForStatus(flight.status)
+    property int modeIndex: 0
     property int yaw: 1500
     property int roll: 1500
     property int throttle: 1000
     property int pitch: 1500
-    readonly property bool flightReady: flight.status === Flight.FLIGHT_STATUS_READY
-    readonly property bool flightAngleMode: flight.status === Flight.FLIGHT_STATUS_ANGLE_MODE
-    readonly property bool flightRateMode: flight.status === Flight.FLIGHT_STATUS_ANGLE_RATE_MODE
-    readonly property bool flightRcMode: flightReady || flightAngleMode || flightRateMode
+    property int aux1: 1000
     readonly property bool gamepadConnected: gamepadOptions.length > 0 && gamepadOptions[gamepadIndex] !== "No gamepad connected"
     readonly property bool selectedControllerAvailable: controllerIndex !== controllerGamepadIndex || gamepadConnected
     readonly property bool controllerControlsEnabled: !controlOpen
     readonly property bool gamepadControlsEnabled: controllerControlsEnabled && controllerIndex === controllerGamepadIndex
-    readonly property bool rcControlsEnabled: controlOpen && droneSession.isOpen && flightRcMode && selectedControllerAvailable
+    readonly property bool rcControlsEnabled: controlOpen && droneSession.isOpen && selectedControllerAvailable
+    readonly property bool rcStreamingEnabled: visible && rcControlsEnabled
 
     function clampRc(value) {
         return Math.max(rcMin, Math.min(rcMax, Math.round(Number(value))))
     }
 
-    function modeIndexForStatus(status) {
-        if (status === Flight.FLIGHT_STATUS_ANGLE_MODE) {
-            return 1
+    function byteToHex(value) {
+        var hex = (Number(value) & 0xff).toString(16).toUpperCase()
+        return hex.length < 2 ? "0" + hex : hex
+    }
+
+    function wordToHex(value) {
+        var channel = clampRc(value)
+        return byteToHex(channel & 0xff) + " " + byteToHex((channel >> 8) & 0xff)
+    }
+
+    function modeAux2Value() {
+        if (modeIndex === 1) {
+            return 1500
         }
-        if (status === Flight.FLIGHT_STATUS_ANGLE_RATE_MODE) {
-            return 2
+        if (modeIndex === 2) {
+            return 2000
         }
-        return 0
+        return 1000
+    }
+
+    function pcRcPayloadHex() {
+        return [
+            wordToHex(roll),
+            wordToHex(pitch),
+            wordToHex(throttle),
+            wordToHex(yaw),
+            wordToHex(aux1),
+            wordToHex(modeAux2Value())
+        ].join(" ")
+    }
+
+    function sendRcChannels() {
+        if (!rcStreamingEnabled) {
+            return
+        }
+
+        droneSession.sendAnotcCommand(pcRcCommandCid0,
+                                      pcRcCommandCid1,
+                                      pcRcCommandCid2,
+                                      pcRcPayloadHex())
     }
 
     onVisibleChanged: {
         if (visible) {
-            controlOpen = droneSession.isOpen && flightReady && selectedControllerAvailable
             raise()
             requestActivate()
+        } else {
+            controlOpen = false
         }
     }
 
@@ -75,14 +108,18 @@ Window {
         }
     }
 
-    Connections {
-        target: flight
-
-        function onStatusChanged() {
-            if (root.controlOpen && (!root.flightRcMode || !root.selectedControllerAvailable)) {
-                root.controlOpen = false
-            }
+    onSelectedControllerAvailableChanged: {
+        if (!selectedControllerAvailable) {
+            controlOpen = false
         }
+    }
+
+    Timer {
+        interval: root.rcSendIntervalMs
+        repeat: true
+        running: root.rcStreamingEnabled
+        triggeredOnStart: true
+        onTriggered: root.sendRcChannels()
     }
 
     Item {
@@ -104,10 +141,10 @@ Window {
 
                 ToggleSwitch {
                     checked: root.controlOpen
-                    enabled: droneSession.isOpen && root.selectedControllerAvailable && (root.controlOpen || root.flightReady)
+                    enabled: droneSession.isOpen && root.selectedControllerAvailable
                     anchors.verticalCenter: parent.verticalCenter
                     onToggled: function(checked) {
-                        if (checked && (!root.flightReady || !root.selectedControllerAvailable)) {
+                        if (checked && (!droneSession.isOpen || !root.selectedControllerAvailable)) {
                             return
                         }
                         root.controlOpen = checked
@@ -194,6 +231,9 @@ Window {
                         enabled: root.rcControlsEnabled
                         Layout.fillWidth: true
                         Layout.preferredHeight: 34
+                        onActivated: function(index) {
+                            root.modeIndex = index
+                        }
                     }
                 }
 
@@ -412,15 +452,21 @@ Window {
 
         property string label: ""
         property int value: 1500
+        readonly property real valueRatio: (root.clampRc(value) - root.rcMin) / (root.rcMax - root.rcMin)
         signal valueEdited(int value)
 
         opacity: enabled ? 1.0 : 0.55
+
+        function updateFromTrackX(localX) {
+            var ratio = Math.max(0, Math.min(1, localX / track.width))
+            valueEdited(root.clampRc(root.rcMin + ratio * (root.rcMax - root.rcMin)))
+        }
 
         Text {
             text: rcControl.value
             color: "#18325f"
             font.pixelSize: 18
-            anchors.horizontalCenter: slider.horizontalCenter
+            anchors.horizontalCenter: track.horizontalCenter
             anchors.top: parent.top
         }
 
@@ -429,43 +475,37 @@ Window {
             color: "#2f343b"
             font.pixelSize: 15
             anchors.left: parent.left
-            anchors.verticalCenter: slider.verticalCenter
+            anchors.verticalCenter: track.verticalCenter
         }
 
-        Slider {
-            id: slider
-            from: root.rcMin
-            to: root.rcMax
-            stepSize: 1
-            value: rcControl.value
-            enabled: rcControl.enabled
+        Item {
+            id: track
             anchors.left: parent.left
             anchors.leftMargin: 52
             anchors.right: parent.right
             anchors.rightMargin: 8
             anchors.verticalCenter: parent.verticalCenter
             height: 34
-            onMoved: rcControl.valueEdited(Math.round(value))
 
-            background: Rectangle {
-                x: slider.leftPadding
-                y: slider.topPadding + slider.availableHeight / 2 - height / 2
-                width: slider.availableWidth
+            Rectangle {
+                anchors.left: parent.left
+                anchors.right: parent.right
+                anchors.verticalCenter: parent.verticalCenter
                 height: 6
                 radius: 3
                 color: "#e3e7ed"
 
                 Rectangle {
-                    width: slider.visualPosition * parent.width
+                    width: rcControl.valueRatio * parent.width
                     height: parent.height
                     radius: parent.radius
                     color: "#4c75f2"
                 }
             }
 
-            handle: Rectangle {
-                x: slider.leftPadding + slider.visualPosition * (slider.availableWidth - width)
-                y: slider.topPadding + slider.availableHeight / 2 - height / 2
+            Rectangle {
+                x: rcControl.valueRatio * (track.width - width)
+                anchors.verticalCenter: parent.verticalCenter
                 width: 24
                 height: 24
                 radius: 12
@@ -473,13 +513,28 @@ Window {
                 border.color: "#d7dce4"
                 border.width: 1
             }
+
+            MouseArea {
+                anchors.fill: parent
+                enabled: rcControl.enabled
+                hoverEnabled: true
+                cursorShape: enabled ? Qt.PointingHandCursor : Qt.ArrowCursor
+                onPressed: function(mouse) {
+                    rcControl.updateFromTrackX(mouse.x)
+                }
+                onPositionChanged: function(mouse) {
+                    if (pressed) {
+                        rcControl.updateFromTrackX(mouse.x)
+                    }
+                }
+            }
         }
 
         Text {
             text: root.rcMin
             color: "#6b7280"
             font.pixelSize: 13
-            anchors.left: slider.left
+            anchors.left: track.left
             anchors.bottom: parent.bottom
         }
 
@@ -487,7 +542,7 @@ Window {
             text: root.rcMax
             color: "#6b7280"
             font.pixelSize: 13
-            anchors.right: slider.right
+            anchors.right: track.right
             anchors.bottom: parent.bottom
         }
     }
@@ -497,79 +552,92 @@ Window {
 
         property string label: ""
         property int value: 1000
+        readonly property real valueRatio: (root.clampRc(value) - root.rcMin) / (root.rcMax - root.rcMin)
         signal valueEdited(int value)
 
         opacity: enabled ? 1.0 : 0.55
 
-        Slider {
-            id: verticalSlider
-            orientation: Qt.Vertical
-            from: root.rcMin
-            to: root.rcMax
-            stepSize: 1
-            value: rcControl.value
-            enabled: rcControl.enabled
+        function updateFromTrackY(localY) {
+            var ratio = Math.max(0, Math.min(1, localY / verticalTrack.height))
+            valueEdited(root.clampRc(root.rcMax - ratio * (root.rcMax - root.rcMin)))
+        }
+
+        Item {
+            id: verticalTrack
             width: 34
             anchors.horizontalCenter: parent.horizontalCenter
             anchors.top: parent.top
             anchors.bottom: labelText.top
             anchors.bottomMargin: 18
-            onMoved: rcControl.valueEdited(Math.round(value))
 
-            background: Rectangle {
-                x: verticalSlider.leftPadding + verticalSlider.availableWidth / 2 - width / 2
-                y: verticalSlider.topPadding
+            Rectangle {
+                anchors.horizontalCenter: parent.horizontalCenter
                 width: 6
-                height: verticalSlider.availableHeight
+                height: parent.height
                 radius: 3
                 color: "#e3e7ed"
 
                 Rectangle {
                     anchors.bottom: parent.bottom
                     width: parent.width
-                    height: (1 - verticalSlider.visualPosition) * parent.height
+                    height: rcControl.valueRatio * parent.height
                     radius: parent.radius
                     color: "#4c75f2"
                 }
             }
 
-            handle: Rectangle {
-                id: verticalHandle
-
-                x: verticalSlider.leftPadding + verticalSlider.availableWidth / 2 - width / 2
-                y: verticalSlider.topPadding + verticalSlider.visualPosition * (verticalSlider.availableHeight - height)
-                width: 24
-                height: 24
-                radius: 12
-                color: "#ffffff"
-                border.color: "#d7dce4"
-                border.width: 1
+            MouseArea {
+                anchors.fill: parent
+                enabled: rcControl.enabled
+                hoverEnabled: true
+                cursorShape: enabled ? Qt.PointingHandCursor : Qt.ArrowCursor
+                onPressed: function(mouse) {
+                    rcControl.updateFromTrackY(mouse.y)
+                }
+                onPositionChanged: function(mouse) {
+                    if (pressed) {
+                        rcControl.updateFromTrackY(mouse.y)
+                    }
+                }
             }
+        }
+
+        Rectangle {
+            id: verticalHandle
+
+            x: verticalTrack.x + verticalTrack.width / 2 - width / 2
+            y: verticalTrack.y + (1 - rcControl.valueRatio) * (verticalTrack.height - height)
+            width: 24
+            height: 24
+            radius: 12
+            color: "#ffffff"
+            border.color: "#d7dce4"
+            border.width: 1
         }
 
         Text {
             text: root.rcMax
             color: "#6b7280"
             font.pixelSize: 13
-            anchors.right: verticalSlider.left
+            anchors.right: verticalTrack.left
             anchors.rightMargin: 14
-            anchors.top: verticalSlider.top
+            anchors.top: verticalTrack.top
         }
 
         Text {
             text: root.rcMin
             color: "#6b7280"
             font.pixelSize: 13
-            anchors.right: verticalSlider.left
+            anchors.right: verticalTrack.left
             anchors.rightMargin: 14
-            anchors.bottom: verticalSlider.bottom
+            anchors.bottom: verticalTrack.bottom
         }
 
         Text {
             text: rcControl.value
             color: "#18325f"
             font.pixelSize: 18
-            anchors.left: verticalSlider.right
+            anchors.left: verticalTrack.right
             anchors.leftMargin: 18
             anchors.verticalCenter: verticalHandle.verticalCenter
         }

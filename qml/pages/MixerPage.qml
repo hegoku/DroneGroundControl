@@ -530,18 +530,22 @@ ScrollView {
                         Layout.preferredHeight: 34
                         spacing: 10
 
-                        CheckBox {
+                        Item {
                             id: testModeCheck
-                            checked: root.motorTestMode
-                            enabled: root.motorTestModeToggleEnabled
-                            text: "Motor Test Mode"
-                            font.pixelSize: root.pageFontSize
+                            property bool checked: root.motorTestMode
 
-                            indicator: Rectangle {
-                                implicitWidth: 18
-                                implicitHeight: 18
-                                x: testModeCheck.leftPadding
-                                y: parent.height / 2 - height / 2
+                            enabled: root.motorTestModeToggleEnabled
+                            activeFocusOnTab: enabled
+                            Layout.preferredWidth: 150
+                            Layout.fillHeight: true
+                            opacity: enabled ? 1.0 : 0.55
+
+                            Rectangle {
+                                id: testModeIndicator
+                                width: 18
+                                height: 18
+                                anchors.left: parent.left
+                                anchors.verticalCenter: parent.verticalCenter
                                 radius: 4
                                 color: testModeCheck.enabled ? "#ffffff" : "#fbfcfd"
                                 border.color: testModeCheck.checked ? "#4c75f2" : "#cfd5dd"
@@ -569,29 +573,28 @@ ScrollView {
                                 }
                             }
 
-                            contentItem: Text {
-                                text: testModeCheck.text
-                                font: testModeCheck.font
+                            Text {
+                                anchors.left: testModeIndicator.right
+                                anchors.leftMargin: 8
+                                anchors.right: parent.right
+                                anchors.verticalCenter: parent.verticalCenter
+                                text: "Motor Test Mode"
+                                font.pixelSize: root.pageFontSize
                                 color: testModeCheck.enabled ? "#2d333b" : "#9aa3af"
                                 verticalAlignment: Text.AlignVCenter
-                                leftPadding: testModeCheck.indicator.width + testModeCheck.spacing
+                                elide: Text.ElideRight
                             }
 
-                            onClicked: {
-                                var requestedMode = checked
-                                checked = root.motorTestMode
-                                root.setMotorTestMode(requestedMode)
+                            MouseArea {
+                                anchors.fill: parent
+                                enabled: testModeCheck.enabled
+                                hoverEnabled: true
+                                cursorShape: enabled ? Qt.PointingHandCursor : Qt.ArrowCursor
+                                onClicked: root.setMotorTestMode(!root.motorTestMode)
                             }
 
-                            Connections {
-                                target: root
-
-                                function onMotorTestModeChanged() {
-                                    if (testModeCheck.checked !== root.motorTestMode) {
-                                        testModeCheck.checked = root.motorTestMode
-                                    }
-                                }
-                            }
+                            Keys.onReturnPressed: if (enabled) root.setMotorTestMode(!root.motorTestMode)
+                            Keys.onSpacePressed: if (enabled) root.setMotorTestMode(!root.motorTestMode)
                         }
                     }
                 }
