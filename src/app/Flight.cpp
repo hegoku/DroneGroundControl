@@ -33,11 +33,23 @@ int Flight::batteryCount() const
     return m_batteryCount;
 }
 
+Flight::flight_status Flight::status() const
+{
+    return m_status;
+}
+
+unsigned char Flight::cpuLoad() const
+{
+    return m_cpuLoad;
+}
+
 void Flight::reset()
 {
     setImu(false);
     setMag(false);
     setBaro(false);
+    setStatus(FLIGHT_STATUS_SELFTEST);
+    setCpuLoad(0);
     if (!qFuzzyIsNull(m_voltage)) {
         m_voltage = 0.0;
         emit voltageChanged();
@@ -76,9 +88,12 @@ void Flight::setBatteryCount(int count)
 void Flight::processFrames(const QVector<_un_anotc_v8_frame> &frames)
 {
     for (const _un_anotc_v8_frame &frame : frames) {
-        if (frame.frame.fun != ANOTC_FRAME_CUSTOM_SYSTEM_INFO || frame.frame.len < 4) {
+        if (frame.frame.fun != ANOTC_FRAME_CUSTOM_SYSTEM_INFO || frame.frame.len < 7) {
             continue;
         }
+
+        setStatus(static_cast<flight_status>(frame.frame.data[0]));
+        setCpuLoad(frame.frame.data[1]);
 
         const quint16 rawVoltage = qFromLittleEndian<quint16>(frame.frame.data + 2);
         setVoltage(static_cast<double>(rawVoltage) / 100.0);
@@ -93,4 +108,24 @@ void Flight::setVoltage(double voltage)
 
     m_voltage = voltage;
     emit voltageChanged();
+}
+
+void Flight::setStatus(flight_status status)
+{
+    if (m_status == status) {
+        return;
+    }
+
+    m_status = status;
+    emit statusChanged();
+}
+
+void Flight::setCpuLoad(unsigned char cpuLoad)
+{
+    if (m_cpuLoad == cpuLoad) {
+        return;
+    }
+
+    m_cpuLoad = cpuLoad;
+    emit cpuLoadChanged();
 }

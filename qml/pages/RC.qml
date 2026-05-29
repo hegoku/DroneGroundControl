@@ -1,6 +1,7 @@
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
+import DroneGroundControl
 import "../components"
 
 Rectangle {
@@ -18,6 +19,8 @@ Rectangle {
     property bool savingProtocol: false
     property string statusMessage: droneSession.isOpen ? "Ready" : "Connect to a drone to edit RC settings"
     property var simulatorWindow: null
+    readonly property bool flightReady: flight.status === Flight.FLIGHT_STATUS_READY
+    readonly property bool protocolControlsEnabled: droneSession.isOpen && flightReady && !loadingProtocol && !savingProtocol
 
     function parseProtocol(hex) {
         var normalized = String(hex || "").replace(/\s+/g, "")
@@ -38,6 +41,10 @@ Rectangle {
         }
         if (!droneSession.isOpen) {
             statusMessage = "Connect to a drone to edit RC settings"
+            return
+        }
+        if (!flightReady) {
+            statusMessage = "Drone must be ready before reading RC settings"
             return
         }
 
@@ -66,6 +73,10 @@ Rectangle {
         }
         if (!droneSession.isOpen) {
             statusMessage = "Connect to a drone before saving RC settings"
+            return
+        }
+        if (!flightReady) {
+            statusMessage = "Drone must be ready before saving RC settings"
             return
         }
 
@@ -146,6 +157,16 @@ Rectangle {
         }
     }
 
+    Connections {
+        target: flight
+
+        function onStatusChanged() {
+            if (droneSession.isOpen && root.flightReady) {
+                root.refreshProtocol()
+            }
+        }
+    }
+
     ScrollView {
         anchors.fill: parent
         anchors.margins: 5
@@ -188,7 +209,7 @@ Rectangle {
                             StyledSelect {
                                 id: protocolCombo
                                 model: root.protocolOptions
-                                enabled: droneSession.isOpen && !root.loadingProtocol && !root.savingProtocol
+                                enabled: root.protocolControlsEnabled
                                 Layout.fillWidth: true
 
                                 Component.onCompleted: currentIndex = root.selectedProtocol
@@ -232,8 +253,7 @@ Rectangle {
                             StyledButton {
                                 text: "Cancel"
                                 styleName: "cancel-button"
-                                enabled: droneSession.isOpen && !root.loadingProtocol && !root.savingProtocol
-                                         && root.selectedProtocol !== root.loadedProtocol
+                                enabled: root.protocolControlsEnabled && root.selectedProtocol !== root.loadedProtocol
                                 Layout.preferredWidth: 78
                                 onClicked: root.cancelChanges()
                             }
@@ -241,7 +261,7 @@ Rectangle {
                             StyledButton {
                                 text: root.savingProtocol ? "Saving..." : "Save & Reboot"
                                 styleName: "primary-button"
-                                enabled: droneSession.isOpen && !root.loadingProtocol && !root.savingProtocol
+                                enabled: root.protocolControlsEnabled
                                 Layout.preferredWidth: 112
                                 onClicked: root.saveAndReboot()
                             }

@@ -208,6 +208,21 @@ ApplicationWindow {
                 id: statusControls
                 anchors.right: parent.right
                 height: parent.height
+                spacing: 4
+
+                Text {
+                    id: cpuLoadText
+                    text: Math.round(Number(flight.cpu_load)) + "%"
+                    color: "#d8d8d8"
+                    font.pixelSize: 13
+                    font.bold: true
+                    horizontalAlignment: Text.AlignRight
+                    verticalAlignment: Text.AlignVCenter
+                    width: 42
+                    height: 40
+                    anchors.verticalCenter: parent.verticalCenter
+                }
+
                 Battery {
                     id: batteryWidget
                     voltage: flight.voltage

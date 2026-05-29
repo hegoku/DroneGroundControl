@@ -1,6 +1,7 @@
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
+import DroneGroundControl
 import "../components"
 
 ScrollView {
@@ -27,7 +28,10 @@ ScrollView {
     property var liveMotorValues: [0, 0, 0, 0]
     property string statusMessage: droneSession.isOpen ? "Ready" : "Connect to a drone to edit mixer settings"
 
-    readonly property bool protocolControlsEnabled: droneSession.isOpen && !loadingProtocol && !savingProtocol
+    readonly property bool flightReady: flight.status === Flight.FLIGHT_STATUS_READY
+    readonly property bool motorTestStatus: flight.status === Flight.FLIGHT_STATUS_MOTOR_TEST
+    readonly property bool protocolControlsEnabled: droneSession.isOpen && flightReady && !loadingProtocol && !savingProtocol
+    readonly property bool motorTestModeToggleEnabled: droneSession.isOpen && (flightReady || motorTestStatus || motorTestMode) && !changingMotorTestMode
     readonly property bool motorControlsEnabled: droneSession.isOpen && motorTestMode && !changingMotorTestMode
 
     function parseProtocol(hex) {
@@ -113,6 +117,10 @@ ScrollView {
             statusMessage = "Connect to a drone to edit mixer settings"
             return
         }
+        if (!flightReady) {
+            statusMessage = "Drone must be ready before reading mixer settings"
+            return
+        }
 
         loadingProtocol = true
         statusMessage = "Reading ESC protocol"
@@ -135,6 +143,9 @@ ScrollView {
 
     function saveAndReboot() {
         if (!protocolControlsEnabled) {
+            if (droneSession.isOpen && !flightReady) {
+                statusMessage = "Drone must be ready before saving mixer settings"
+            }
             return
         }
 
@@ -179,6 +190,10 @@ ScrollView {
 
     function setMotorTestMode(enabled) {
         if (!droneSession.isOpen || changingMotorTestMode) {
+            return
+        }
+        if (enabled && !flightReady) {
+            statusMessage = "Drone must be ready before enabling motor test mode"
             return
         }
 
@@ -289,6 +304,16 @@ ScrollView {
             var payloads = connectionSessionBridge.commandFramePayloads(frames)
             for (var i = 0; i < payloads.length; ++i) {
                 root.handleTelemetryPayload(payloads[i])
+            }
+        }
+    }
+
+    Connections {
+        target: flight
+
+        function onStatusChanged() {
+            if (droneSession.isOpen && root.flightReady) {
+                root.refreshProtocol()
             }
         }
     }
@@ -508,7 +533,7 @@ ScrollView {
                         CheckBox {
                             id: testModeCheck
                             checked: root.motorTestMode
-                            enabled: droneSession.isOpen && !root.changingMotorTestMode
+                            enabled: root.motorTestModeToggleEnabled
                             text: "Motor Test Mode"
                             font.pixelSize: root.pageFontSize
 

@@ -1,5 +1,6 @@
 import QtQuick
 import QtQuick.Controls
+import DroneGroundControl
 import "../components"
 
 Rectangle {
@@ -20,6 +21,7 @@ Rectangle {
     property var columnWidths: [80, 210, 150, 110, 110, 320]
     property var minimumColumnWidths: [60, 120, 100, 80, 90, 140]
     property real lastTableWidth: 0
+    readonly property bool flightReady: flight.status === Flight.FLIGHT_STATUS_READY
 
     function totalColumnWidth(widths) {
         var total = 0
@@ -242,6 +244,10 @@ Rectangle {
             statusMessage = "Connect to a drone before saving parameters"
             return
         }
+        if (!flightReady) {
+            statusMessage = "Drone must be ready before saving parameters"
+            return
+        }
 
         var ids = store.dirtyParameterIds()
         if (ids.length === 0) {
@@ -273,6 +279,10 @@ Rectangle {
         }
         if (!droneSession.isOpen) {
             statusMessage = "Connect to a drone before reading parameters"
+            return
+        }
+        if (!flightReady) {
+            statusMessage = "Drone must be ready before reading parameters"
             return
         }
 
@@ -336,7 +346,7 @@ Rectangle {
                 height: 32
                 styleName: "primary-button"
                 text: reading ? "Reading" : "Read All"
-                enabled: droneSession.isOpen && !reading && !saving
+                enabled: droneSession.isOpen && root.flightReady && !reading && !saving
                 onClicked: readAll()
             }
 
@@ -346,7 +356,7 @@ Rectangle {
                 height: 32
                 styleName: "primary-button"
                 text: saving ? "Saving" : "Save"
-                enabled: droneSession.isOpen && !reading && !saving && store.dirtyCount > 0
+                enabled: droneSession.isOpen && root.flightReady && !reading && !saving && store.dirtyCount > 0
                 onClicked: saveAll()
             }
 

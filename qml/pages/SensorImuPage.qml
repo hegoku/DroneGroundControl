@@ -1,6 +1,7 @@
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
+import DroneGroundControl
 import "../components"
 
 ScrollView {
@@ -85,7 +86,9 @@ ScrollView {
     property int gyroCalibrationProgress: 0
     property string statusMessage: droneSession.isOpen ? "Ready" : "Connect to a drone to load IMU settings"
     property int loadGeneration: 0
+    readonly property bool flightReady: flight.status === Flight.FLIGHT_STATUS_READY
     readonly property bool controlsEnabled: droneSession.isOpen
+                                            && flightReady
                                             && !loadingParameters
                                             && !savingParameters
                                             && !calibratingGyro
@@ -276,6 +279,10 @@ ScrollView {
             statusMessage = "Connect to a drone to load IMU settings"
             return
         }
+        if (!flightReady) {
+            statusMessage = "Drone must be ready before loading IMU settings"
+            return
+        }
 
         loadingParameters = true
         loadGeneration += 1
@@ -422,6 +429,10 @@ ScrollView {
             statusMessage = "Connect to a drone before saving IMU settings"
             return
         }
+        if (!flightReady) {
+            statusMessage = "Drone must be ready before saving IMU settings"
+            return
+        }
         if (!cutoffIsValid(gyroCutoffText)) {
             statusMessage = "Gyroscope low pass filter must be 1-999"
             return
@@ -451,6 +462,10 @@ ScrollView {
             statusMessage = "Connect to a drone before calibrating gyro"
             return
         }
+        if (!flightReady) {
+            statusMessage = "Drone must be ready before calibrating gyro"
+            return
+        }
 
         calibratingGyro = true
         gyroCalibrationProgress = 0
@@ -468,6 +483,9 @@ ScrollView {
 
     function startAccelCalibration() {
         if (!controlsEnabled) {
+            if (droneSession.isOpen && !flightReady) {
+                statusMessage = "Drone must be ready before calibrating accelerometer"
+            }
             return
         }
 
@@ -652,6 +670,16 @@ ScrollView {
             var payloads = connectionSessionBridge.commandFramePayloads(frames)
             for (var i = 0; i < payloads.length; ++i) {
                 root.handleCommandFramePayload(payloads[i])
+            }
+        }
+    }
+
+    Connections {
+        target: flight
+
+        function onStatusChanged() {
+            if (droneSession.isOpen && root.flightReady) {
+                root.refreshImuParameters()
             }
         }
     }

@@ -4,6 +4,7 @@ import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
 import QtQuick.Window
+import DroneGroundControl
 import "../components"
 
 Window {
@@ -22,25 +23,65 @@ Window {
     readonly property var controllerOptions: ["Mouse", "Gamepad"]
     readonly property var gamepadOptions: ["No gamepad connected"]
     readonly property var modeOptions: ["Ready", "Angle", "Rate"]
+    readonly property int controllerGamepadIndex: 1
 
     property bool controlOpen: true
     property int controllerIndex: 1
     property int gamepadIndex: 0
-    property int modeIndex: 1
+    readonly property int modeIndex: modeIndexForStatus(flight.status)
     property int yaw: 1500
     property int roll: 1500
     property int throttle: 1000
     property int pitch: 1500
+    readonly property bool flightReady: flight.status === Flight.FLIGHT_STATUS_READY
+    readonly property bool flightAngleMode: flight.status === Flight.FLIGHT_STATUS_ANGLE_MODE
+    readonly property bool flightRateMode: flight.status === Flight.FLIGHT_STATUS_ANGLE_RATE_MODE
+    readonly property bool flightRcMode: flightReady || flightAngleMode || flightRateMode
+    readonly property bool gamepadConnected: gamepadOptions.length > 0 && gamepadOptions[gamepadIndex] !== "No gamepad connected"
+    readonly property bool selectedControllerAvailable: controllerIndex !== controllerGamepadIndex || gamepadConnected
+    readonly property bool controllerControlsEnabled: !controlOpen
+    readonly property bool gamepadControlsEnabled: controllerControlsEnabled && controllerIndex === controllerGamepadIndex
+    readonly property bool rcControlsEnabled: controlOpen && droneSession.isOpen && flightRcMode && selectedControllerAvailable
 
     function clampRc(value) {
         return Math.max(rcMin, Math.min(rcMax, Math.round(Number(value))))
     }
 
+    function modeIndexForStatus(status) {
+        if (status === Flight.FLIGHT_STATUS_ANGLE_MODE) {
+            return 1
+        }
+        if (status === Flight.FLIGHT_STATUS_ANGLE_RATE_MODE) {
+            return 2
+        }
+        return 0
+    }
+
     onVisibleChanged: {
         if (visible) {
-            controlOpen = true
+            controlOpen = droneSession.isOpen && flightReady && selectedControllerAvailable
             raise()
             requestActivate()
+        }
+    }
+
+    Connections {
+        target: droneSession
+
+        function onIsOpenChanged() {
+            if (!droneSession.isOpen) {
+                root.controlOpen = false
+            }
+        }
+    }
+
+    Connections {
+        target: flight
+
+        function onStatusChanged() {
+            if (root.controlOpen && (!root.flightRcMode || !root.selectedControllerAvailable)) {
+                root.controlOpen = false
+            }
         }
     }
 
@@ -63,8 +104,12 @@ Window {
 
                 ToggleSwitch {
                     checked: root.controlOpen
+                    enabled: droneSession.isOpen && root.selectedControllerAvailable && (root.controlOpen || root.flightReady)
                     anchors.verticalCenter: parent.verticalCenter
                     onToggled: function(checked) {
+                        if (checked && (!root.flightReady || !root.selectedControllerAvailable)) {
+                            return
+                        }
                         root.controlOpen = checked
                     }
                 }
@@ -106,7 +151,7 @@ Window {
                     StyledSelect {
                         model: root.controllerOptions
                         currentIndex: root.controllerIndex
-                        enabled: root.controlOpen
+                        enabled: root.controllerControlsEnabled
                         Layout.fillWidth: true
                         Layout.preferredHeight: 34
                         onActivated: function(index) {
@@ -123,7 +168,7 @@ Window {
                     StyledSelect {
                         model: root.gamepadOptions
                         currentIndex: root.gamepadIndex
-                        enabled: root.controlOpen
+                        enabled: root.gamepadControlsEnabled
                         Layout.fillWidth: true
                         Layout.preferredHeight: 34
                         onActivated: function(index) {
@@ -146,12 +191,9 @@ Window {
                     ModeSegment {
                         options: root.modeOptions
                         currentIndex: root.modeIndex
-                        enabled: root.controlOpen
+                        enabled: root.rcControlsEnabled
                         Layout.fillWidth: true
                         Layout.preferredHeight: 34
-                        onActivated: function(index) {
-                            root.modeIndex = index
-                        }
                     }
                 }
 
@@ -195,7 +237,7 @@ Window {
             HorizontalRcControl {
                 label: "Yaw"
                 value: root.yaw
-                enabled: root.controlOpen
+                enabled: root.rcControlsEnabled
                 anchors.left: parent.left
                 anchors.leftMargin: 78
                 anchors.right: parent.horizontalCenter
@@ -211,7 +253,7 @@ Window {
             VerticalRcControl {
                 label: "Throttle"
                 value: root.throttle
-                enabled: root.controlOpen
+                enabled: root.rcControlsEnabled
                 anchors.left: parent.left
                 anchors.right: parent.horizontalCenter
                 anchors.rightMargin: 20
@@ -235,7 +277,7 @@ Window {
                 defaultYValue: 1500
                 returnXToDefaultOnRelease: true
                 returnYToDefaultOnRelease: true
-                enabled: root.controlOpen
+                enabled: root.rcControlsEnabled
                 anchors.left: parent.horizontalCenter
                 anchors.leftMargin: 46
                 anchors.right: parent.right
