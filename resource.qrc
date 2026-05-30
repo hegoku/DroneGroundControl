@@ -52,5 +52,6 @@
         <file>resources/icons/target.svg</file>
         <file>resources/icons/crop.svg</file>
         <file>resources/icons/histogram-show-all.svg</file>
+        <file>resources/icons/open-in-new-window.svg</file>
     </qresource>
 </RCC>

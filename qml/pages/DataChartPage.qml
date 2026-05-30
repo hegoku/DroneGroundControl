@@ -9,6 +9,7 @@ Rectangle {
     id: root
     anchors.fill: parent
     color: "#f4f6f8"
+    property bool detached: false
 
     function buttonColor(checked) {
         return checked ? "#e8f0ff" : "#ffffff"
@@ -16,6 +17,55 @@ Rectangle {
 
     function buttonBorder(checked) {
         return checked ? "#4c8bf5" : "#d8dde5"
+    }
+
+    function detachToWindow() {
+        if (detached) {
+            detachedWindow.raise()
+            detachedWindow.requestActivate()
+            return
+        }
+
+        detached = true
+        detachedWindow.show()
+        detachedWindow.raise()
+        detachedWindow.requestActivate()
+        benchmark.attachWindow(detachedWindow)
+    }
+
+    function attachToPage() {
+        if (!detached) {
+            return
+        }
+
+        detached = false
+        benchmark.attachWindow(root.Window.window)
+    }
+
+    function toggleDetachedWindow() {
+        if (detached) {
+            detachedWindow.close()
+        } else {
+            detachToWindow()
+        }
+    }
+
+    Window {
+        id: detachedWindow
+        width: 1060
+        height: 680
+        minimumWidth: 760
+        minimumHeight: 460
+        visible: false
+        title: "Data Analysis"
+        color: "#f4f6f8"
+
+        onClosing: root.attachToPage()
+        onVisibleChanged: {
+            if (!visible) {
+                root.attachToPage()
+            }
+        }
     }
 
     FileDialog {
@@ -130,38 +180,76 @@ Rectangle {
         }
     }
 
-    RowLayout {
+    Item {
+        id: embeddedHost
         anchors.fill: parent
-        anchors.margins: 5
-        spacing: 14
+    }
 
-        SignalPanel {
-            Layout.preferredWidth: 200
-            Layout.fillHeight: true
-            chartModel: chartDataModel
+    Rectangle {
+        anchors.fill: parent
+        visible: root.detached
+        color: "#f4f6f8"
+
+        Column {
+            anchors.centerIn: parent
+            spacing: 12
+
+            Label {
+                anchors.horizontalCenter: parent.horizontalCenter
+                text: "Data Analysis is open in a separate window."
+                color: "#4b5563"
+                font.pixelSize: 14
+            }
+
+            Button {
+                anchors.horizontalCenter: parent.horizontalCenter
+                text: "Return to page"
+                onClicked: root.toggleDetachedWindow()
+            }
         }
+    }
 
-        Rectangle {
-            Layout.fillWidth: true
-            Layout.fillHeight: true
-            color: "#ffffff"
-            border.color: "#d9dee5"
-            border.width: 1
+    Item {
+        id: analysisContent
+        parent: root.detached ? detachedWindow.contentItem : embeddedHost
+        anchors.fill: parent
 
-            ChartViewPanel {
-                anchors.fill: parent
-                anchors.margins: 5
+        RowLayout {
+            anchors.fill: parent
+            anchors.margins: 5
+            spacing: 14
+
+            SignalPanel {
+                Layout.preferredWidth: 200
+                Layout.fillHeight: true
                 chartModel: chartDataModel
-                benchmarkRunner: benchmark
-                showBenchmarkStatus: true
-                showReceiveButton: true
-                showAutoScrollButton: true
-                showClearButton: true
-                showSaveButton: true
-                showOpenButton: true
-                showBenchmarkButton: true
-                onSaveRequested: saveDialog.open()
-                onOpenRequested: openDialog.open()
+            }
+
+            Rectangle {
+                Layout.fillWidth: true
+                Layout.fillHeight: true
+                color: "#ffffff"
+                border.color: "#d9dee5"
+                border.width: 1
+
+                ChartViewPanel {
+                    anchors.fill: parent
+                    anchors.margins: 5
+                    chartModel: chartDataModel
+                    benchmarkRunner: benchmark
+                    showBenchmarkStatus: true
+                    showReceiveButton: true
+                    showAutoScrollButton: true
+                    showClearButton: true
+                    showSaveButton: true
+                    showOpenButton: true
+                    showBenchmarkButton: true
+                    showDetachButton: true
+                    detached: root.detached
+                    onSaveRequested: saveDialog.open()
+                    onOpenRequested: openDialog.open()
+                    onDetachRequested: root.toggleDetachedWindow()
+                }
             }
         }
     }
@@ -181,8 +269,11 @@ Rectangle {
         property bool showSaveButton: false
         property bool showOpenButton: false
         property bool showBenchmarkButton: false
+        property bool showDetachButton: false
+        property bool detached: false
         signal saveRequested()
         signal openRequested()
+        signal detachRequested()
 
         spacing: 1
 
@@ -272,6 +363,14 @@ Rectangle {
                 iconSource: "qrc:/resources/icons/folder.svg"
                 tooltip: "Open CSV in new chart window"
                 onClicked: chartPanel.openRequested()
+            }
+
+            ChartToolButton {
+                visible: chartPanel.showDetachButton
+                iconSource: "qrc:/resources/icons/open-in-new-window.svg"
+                tooltip: chartPanel.detached ? "Return Data Analysis to main window" : "Open Data Analysis in separate window"
+                checked: chartPanel.detached
+                onClicked: chartPanel.detachRequested()
             }
 
             ChartToolButton {
