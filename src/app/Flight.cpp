@@ -43,6 +43,21 @@ unsigned char Flight::cpuLoad() const
     return m_cpuLoad;
 }
 
+double Flight::roll() const
+{
+    return m_roll;
+}
+
+double Flight::pitch() const
+{
+    return m_pitch;
+}
+
+double Flight::yaw() const
+{
+    return m_yaw;
+}
+
 void Flight::reset()
 {
     setImu(false);
@@ -50,6 +65,7 @@ void Flight::reset()
     setBaro(false);
     setStatus(FLIGHT_STATUS_SELFTEST);
     setCpuLoad(0);
+    setAttitude(0.0, 0.0, 0.0);
     if (!qFuzzyIsNull(m_voltage)) {
         m_voltage = 0.0;
         emit voltageChanged();
@@ -88,6 +104,14 @@ void Flight::setBatteryCount(int count)
 void Flight::processFrames(const QVector<_un_anotc_v8_frame> &frames)
 {
     for (const _un_anotc_v8_frame &frame : frames) {
+        if (frame.frame.fun == ANOTC_FRAME_EULER && frame.frame.len >= 6) {
+            const double roll = static_cast<double>(qFromLittleEndian<qint16>(frame.frame.data)) / 100.0;
+            const double pitch = static_cast<double>(qFromLittleEndian<qint16>(frame.frame.data + 2)) / 100.0;
+            const double yaw = static_cast<double>(qFromLittleEndian<qint16>(frame.frame.data + 4)) / 100.0;
+            setAttitude(roll, pitch, yaw);
+            continue;
+        }
+
         if (frame.frame.fun != ANOTC_FRAME_CUSTOM_SYSTEM_INFO || frame.frame.len < 7) {
             continue;
         }
@@ -128,4 +152,18 @@ void Flight::setCpuLoad(unsigned char cpuLoad)
 
     m_cpuLoad = cpuLoad;
     emit cpuLoadChanged();
+}
+
+void Flight::setAttitude(double roll, double pitch, double yaw)
+{
+    if (qFuzzyCompare(m_roll + 1.0, roll + 1.0)
+        && qFuzzyCompare(m_pitch + 1.0, pitch + 1.0)
+        && qFuzzyCompare(m_yaw + 1.0, yaw + 1.0)) {
+        return;
+    }
+
+    m_roll = roll;
+    m_pitch = pitch;
+    m_yaw = yaw;
+    emit attitudeChanged();
 }

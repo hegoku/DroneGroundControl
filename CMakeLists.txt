@@ -76,6 +76,7 @@ qt_add_qml_module(appDroneGroundControl
     QML_FILES
         qml/Main.qml
         qml/pages/HomePage.qml
+        qml/pages/GroundControlPage.qml
         qml/pages/SensorPage.qml
         qml/pages/SensorImuPage.qml
         qml/pages/SensorMagnetometerPage.qml
@@ -87,6 +88,8 @@ qt_add_qml_module(appDroneGroundControl
         qml/pages/RcSimulatorWindow.qml
         qml/pages/MixerPage.qml
         qml/components/Battery.qml
+        qml/components/AttitudeIndicator.qml
+        qml/components/Compass.qml
         qml/components/SensorStatus.qml
         qml/components/ConnectionButton.qml
         qml/components/ControlPad.qml

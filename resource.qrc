@@ -33,6 +33,7 @@
         <file>resources/icons/app-master.png</file>
         <file>resources/DataFrameDefination.json</file>
         <file>qml/pages/HomePage.qml</file>
+        <file>qml/pages/GroundControlPage.qml</file>
         <file>qml/pages/SensorPage.qml</file>
         <file>qml/pages/SensorImuPage.qml</file>
         <file>qml/pages/SensorMagnetometerPage.qml</file>
@@ -42,6 +43,8 @@
         <file>qml/pages/RcSimulatorWindow.qml</file>
         <file>qml/pages/MixerPage.qml</file>
         <file>qml/components/StyledButton.qml</file>
+        <file>qml/components/AttitudeIndicator.qml</file>
+        <file>qml/components/Compass.qml</file>
         <file>qml/components/ControlPad.qml</file>
         <file>qml/components/StyledPanel.qml</file>
         <file>qml/components/StyledSelect.qml</file>

@@ -368,6 +368,7 @@ ApplicationWindow {
 
                 model: ListModel {
                     ListElement { name: "Home"; page: "pages/HomePage.qml"; iconSource: "qrc:/resources/icons/home.svg" }
+                    ListElement { name: "Ground Control"; page: "pages/GroundControlPage.qml"; iconSource: "qrc:/resources/icons/target.svg" }
                     ListElement { name: "Sensor"; page: "pages/SensorPage.qml"; iconSource: "qrc:/resources/icons/sensor.svg" }
                     ListElement { name: "Parameters"; page: "pages/ParameterPage.qml"; iconSource: "qrc:/resources/icons/basic-setting.svg" }
                     ListElement { name: "Data Frame"; page: "pages/DataFrameTablePage.qml"; iconSource: "qrc:/resources/icons/interface-ui-table-calendar.svg" }
@@ -460,7 +461,7 @@ ApplicationWindow {
             target: dataTableModel
 
             function onAddSelectedData(functionId, parameterIndex) {
-                menuList.currentIndex = 4
+                menuList.currentIndex = 5
                 pageLoader.source = Qt.resolvedUrl("pages/DataChartPage.qml")
             }
         }

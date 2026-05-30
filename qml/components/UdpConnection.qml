@@ -20,7 +20,7 @@ Item {
             id: hostInput
             width: 145
             height: parent.height
-            text: "192.168.1.10"
+            text: "192.168.3.250"
             color: "white"
             selectedTextColor: "white"
             selectionColor: "#4c8bf5"

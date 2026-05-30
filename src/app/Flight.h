@@ -18,6 +18,9 @@ class Flight : public QObject
     Q_PROPERTY(int battery_count READ batteryCount WRITE setBatteryCount NOTIFY batteryCountChanged)
     Q_PROPERTY(flight_status status READ status NOTIFY statusChanged)
     Q_PROPERTY(unsigned char cpu_load READ cpuLoad NOTIFY cpuLoadChanged)
+    Q_PROPERTY(double roll READ roll NOTIFY attitudeChanged)
+    Q_PROPERTY(double pitch READ pitch NOTIFY attitudeChanged)
+    Q_PROPERTY(double yaw READ yaw NOTIFY attitudeChanged)
 
 public:
     enum flight_status {
@@ -48,6 +51,9 @@ public:
     int batteryCount() const;
     flight_status status() const;
     unsigned char cpuLoad() const;
+    double roll() const;
+    double pitch() const;
+    double yaw() const;
 
 public slots:
     void reset();
@@ -65,11 +71,13 @@ signals:
     void batteryCountChanged();
     void statusChanged();
     void cpuLoadChanged();
+    void attitudeChanged();
 
 private:
     void setVoltage(double voltage);
     void setStatus(flight_status status);
     void setCpuLoad(unsigned char cpuLoad);
+    void setAttitude(double roll, double pitch, double yaw);
 
     bool m_imu = false;
     bool m_mag = false;
@@ -78,4 +86,7 @@ private:
     int m_batteryCount = 1;
     flight_status m_status = FLIGHT_STATUS_SELFTEST;
     unsigned char m_cpuLoad = 0;
+    double m_roll = 0.0;
+    double m_pitch = 0.0;
+    double m_yaw = 0.0;
 };
