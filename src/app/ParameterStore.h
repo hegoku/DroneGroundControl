@@ -6,6 +6,7 @@
 #include <QJSValue>
 #include <QObject>
 #include <QString>
+#include <QUrl>
 #include <QVariant>
 
 class ConnectionSession;
@@ -49,6 +50,7 @@ public:
     Q_INVOKABLE bool isEditable(int parameterId) const;
     Q_INVOKABLE int dirtyCount() const;
     Q_INVOKABLE QVariantList dirtyParameterIds() const;
+    Q_INVOKABLE bool exportJson(const QUrl &fileUrl);
     Q_INVOKABLE bool setParameterValueText(int parameterId,
                                            const QString &text,
                                            const QString &owner = QStringLiteral("ParameterStore"));
@@ -119,6 +121,7 @@ private:
                                 const QJSValue &onFailure,
                                 const QString &owner);
     static QVariant decodeValue(const QByteArray &bytes, int type);
+    static QString formatValueText(const QByteArray &bytes, int type);
     static bool encodeValueText(const QString &text, int type, QByteArray *bytes, QString *error);
     static QString typeName(int type);
     static QByteArray bytesFromHex(const QString &hex, bool *ok);

@@ -2,8 +2,14 @@
 
 #include "ConnectionSession.h"
 
+#include <QDateTime>
+#include <QFileInfo>
+#include <QJsonArray>
+#include <QJsonDocument>
+#include <QJsonObject>
 #include <QQmlEngine>
 #include <QRegularExpression>
+#include <QSaveFile>
 
 #include <cstring>
 #include <limits>
@@ -135,6 +141,61 @@ QVariantList ParameterStore::dirtyParameterIds() const
         }
     }
     return ids;
+}
+
+bool ParameterStore::exportJson(const QUrl &fileUrl)
+{
+    QString path = fileUrl.toLocalFile();
+    if (path.isEmpty()) {
+        path = fileUrl.toString();
+    }
+    if (path.isEmpty()) {
+        emit errorOccurred(QStringLiteral("Parameter export path is empty."));
+        return false;
+    }
+    if (QFileInfo(path).suffix().isEmpty()) {
+        path.append(QStringLiteral(".json"));
+    }
+
+    QJsonArray parameters;
+    for (const Entry &entry : m_entries) {
+        if (!entry.hasDefinition && !entry.hasValue) {
+            continue;
+        }
+
+        const QByteArray bytes = entry.dirty ? entry.draftBytes : entry.valueBytes;
+        QJsonObject parameter;
+        parameter.insert(QStringLiteral("id"), entry.id);
+        parameter.insert(QStringLiteral("name"), entry.name);
+        parameter.insert(QStringLiteral("type"), typeName(entry.type));
+        parameter.insert(QStringLiteral("description"), entry.description);
+        if (entry.hasValue || entry.dirty) {
+            parameter.insert(QStringLiteral("value"), formatValueText(bytes, entry.type));
+        }
+        parameters.append(parameter);
+    }
+
+    if (parameters.isEmpty()) {
+        emit errorOccurred(QStringLiteral("There are no loaded parameters to export."));
+        return false;
+    }
+
+    QJsonObject root;
+    root.insert(QStringLiteral("formatVersion"), 1);
+    root.insert(QStringLiteral("exportedAt"), QDateTime::currentDateTimeUtc().toString(Qt::ISODate));
+    root.insert(QStringLiteral("parameters"), parameters);
+
+    QSaveFile file(path);
+    if (!file.open(QIODevice::WriteOnly | QIODevice::Text)) {
+        emit errorOccurred(QStringLiteral("Failed to open %1 for writing.").arg(path));
+        return false;
+    }
+    const QByteArray json = QJsonDocument(root).toJson(QJsonDocument::Indented);
+    if (file.write(json) != json.size() || !file.commit()) {
+        emit errorOccurred(QStringLiteral("Failed to write parameter export to %1.").arg(path));
+        return false;
+    }
+    return true;
 }
 
 bool ParameterStore::setParameterValueText(int parameterId, const QString &text, const QString &owner)
@@ -615,6 +676,23 @@ QVariant ParameterStore::decodeValue(const QByteArray &bytes, int type)
         return QString::fromUtf8(bytes);
     default:
         return QString::fromLatin1(bytes.toHex(' ').toUpper());
+    }
+}
+
+QString ParameterStore::formatValueText(const QByteArray &bytes, int type)
+{
+    const QVariant value = decodeValue(bytes, type);
+    if (!value.isValid()) {
+        return {};
+    }
+
+    switch (type) {
+    case 8:
+        return QString::number(value.toFloat(), 'g', 7);
+    case 9:
+        return QString::number(value.toDouble(), 'g', 15);
+    default:
+        return value.toString();
     }
 }
 

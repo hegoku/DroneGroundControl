@@ -1,5 +1,6 @@
 import QtQuick
 import QtQuick.Controls
+import QtQuick.Dialogs
 import DroneGroundControl
 import "../components"
 
@@ -22,6 +23,27 @@ Rectangle {
     property var minimumColumnWidths: [60, 120, 100, 80, 90, 140]
     property real lastTableWidth: 0
     readonly property bool flightReady: flight.status === Flight.FLIGHT_STATUS_READY
+
+    FileDialog {
+        id: exportDialog
+        title: "Export Parameters"
+        fileMode: FileDialog.SaveFile
+        nameFilters: ["JSON files (*.json)", "All files (*)"]
+        defaultSuffix: "json"
+        onAccepted: {
+            if (store.exportJson(selectedFile)) {
+                statusMessage = "Exported parameters"
+            }
+        }
+    }
+
+    Connections {
+        target: root.store
+
+        function onErrorOccurred(message) {
+            root.statusMessage = message
+        }
+    }
 
     function totalColumnWidth(widths) {
         var total = 0
@@ -360,6 +382,15 @@ Rectangle {
                 onClicked: saveAll()
             }
 
+            StyledButton {
+                id: exportButton
+                width: 78
+                height: 32
+                text: "Export"
+                enabled: !reading && !saving
+                onClicked: exportDialog.open()
+            }
+
             StyledProgressBar {
                 id: operationProgress
                 width: 150
@@ -386,7 +417,7 @@ Rectangle {
                 }
 
                 Text {
-                    width: Math.max(180, toolbar.width - searchControls.width - 430)
+                    width: Math.max(0, toolbar.width - searchControls.width - 525)
                     anchors.verticalCenter: parent.verticalCenter
                     text: statusMessage
                     color: "#2b3036"
