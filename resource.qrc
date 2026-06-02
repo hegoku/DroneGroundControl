@@ -37,6 +37,7 @@
         <file>qml/pages/SensorPage.qml</file>
         <file>qml/pages/SensorImuPage.qml</file>
         <file>qml/pages/SensorMagnetometerPage.qml</file>
+        <file>qml/pages/MagnetometerPointCloudWindow.qml</file>
         <file>qml/pages/ParameterPage.qml</file>
         <file>qml/pages/DataFrameTablePage.qml</file>
         <file>qml/pages/RC.qml</file>
@@ -51,6 +52,7 @@
         <file>qml/components/StyledProgressBar.qml</file>
         <file>qml/components/StyledTab.qml</file>
         <file>qml/components/MessageBox.qml</file>
+        <file>qml/components/MagnetometerPointCloudView.qml</file>
         <file>resources/icons/drag-arrow.svg</file>
         <file>resources/icons/target.svg</file>
         <file>resources/icons/crop.svg</file>

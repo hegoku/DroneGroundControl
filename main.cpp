@@ -4,6 +4,7 @@
 #include "src/app/ConnectionSession.h"
 #include "src/app/ConnectionSessionBridge.h"
 #include "src/app/Flight.h"
+#include "src/app/MagnetometerCalibration.h"
 #include "src/app/RcChannelModel.h"
 
 #include <QGuiApplication>
@@ -22,6 +23,7 @@ int main(int argc, char *argv[])
     DataChartModel dataChartModel;
     RcChannelModel rcChannelModel;
     ConnectionSessionBridge connectionSessionBridge;
+    MagnetometerCalibration magnetometerCalibration;
 
     QQmlApplicationEngine engine;
     engine.rootContext()->setContextProperty("droneSession", &connectionSession);
@@ -30,6 +32,7 @@ int main(int argc, char *argv[])
     engine.rootContext()->setContextProperty("chartDataModel", &dataChartModel);
     engine.rootContext()->setContextProperty("rcChannelModel", &rcChannelModel);
     engine.rootContext()->setContextProperty("connectionSessionBridge", &connectionSessionBridge);
+    engine.rootContext()->setContextProperty("magnetometerCalibration", &magnetometerCalibration);
 
     const QString benchmarkRenderer = QString::fromLocal8Bit(qgetenv("DGC_CHART_BENCHMARK")).trimmed().toLower();
     QString initialPageSource;
@@ -61,6 +64,11 @@ int main(int argc, char *argv[])
                      &ConnectionSession::telemetryFramesReceived,
                      &rcChannelModel,
                      &RcChannelModel::processFrames,
+                     Qt::QueuedConnection);
+    QObject::connect(&connectionSession,
+                     &ConnectionSession::telemetryFramesReceived,
+                     &magnetometerCalibration,
+                     &MagnetometerCalibration::processFrames,
                      Qt::QueuedConnection);
     QObject::connect(&connectionSession,
                      &ConnectionSession::isOpenChanged,

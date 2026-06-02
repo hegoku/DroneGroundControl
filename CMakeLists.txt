@@ -16,6 +16,8 @@ qt_add_executable(appDroneGroundControl
     src/app/ConnectionSession.cpp
     src/app/ConnectionSessionBridge.h
     src/app/ConnectionSessionBridge.cpp
+    src/app/MagnetometerCalibration.h
+    src/app/MagnetometerCalibration.cpp
     src/app/AnotcRequestManager.h
     src/app/AnotcRequestManager.cpp
     src/app/ParameterStore.h
@@ -80,6 +82,7 @@ qt_add_qml_module(appDroneGroundControl
         qml/pages/SensorPage.qml
         qml/pages/SensorImuPage.qml
         qml/pages/SensorMagnetometerPage.qml
+        qml/pages/MagnetometerPointCloudWindow.qml
         qml/pages/ParameterPage.qml
         qml/pages/DataChartPage.qml
         qml/pages/DataChartGraphsPage.qml
@@ -101,6 +104,7 @@ qt_add_qml_module(appDroneGroundControl
         qml/components/StyledProgressBar.qml
         qml/components/StyledTab.qml
         qml/components/MessageBox.qml
+        qml/components/MagnetometerPointCloudView.qml
     RESOURCES resource.qrc
     SOURCES src/protocol/AnotcConfigFrame.h
     SOURCES src/protocol/AnotcCmdFrame.h
@@ -121,6 +125,24 @@ set_target_properties(appDroneGroundControl PROPERTIES
 target_link_libraries(appDroneGroundControl
     PRIVATE Qt6::Quick Qt6::SerialPort Qt6::Network Qt6::Graphs
 )
+
+include(CTest)
+if(BUILD_TESTING)
+    qt_add_executable(magnetometer_calibration_test
+        tools/MagnetometerCalibrationTest.cpp
+        src/app/MagnetometerCalibration.h
+        src/app/MagnetometerCalibration.cpp
+    )
+    target_link_libraries(magnetometer_calibration_test PRIVATE Qt6::Core)
+    add_test(NAME magnetometer_calibration_test COMMAND magnetometer_calibration_test)
+endif()
+
+qt_add_executable(magnetometer_calibration_cli
+    tools/MagnetometerCalibrationCli.cpp
+    src/app/MagnetometerCalibration.h
+    src/app/MagnetometerCalibration.cpp
+)
+target_link_libraries(magnetometer_calibration_cli PRIVATE Qt6::Core)
 
 include(GNUInstallDirs)
 install(TARGETS appDroneGroundControl
