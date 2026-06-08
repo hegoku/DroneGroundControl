@@ -15,6 +15,7 @@ ScrollView {
     readonly property int tableHeaderFontSize: 12
     readonly property int tableRowHeight: 28
     readonly property int controlHeight: 28
+    readonly property bool compactCalibrationLayout: availableWidth < 900
     readonly property int anotcConfigParMagRotation: 16
     readonly property int anotcConfigParMagDeclination: 17
     readonly property int anotcConfigParMagKX1: 18
@@ -67,8 +68,10 @@ ScrollView {
     property string declinationText: ""
     property string loadedDeclinationText: ""
     property string referenceFieldText: ""
-    property var matrixValues: ["-", "-", "-", "-", "-", "-", "-", "-", "-"]
-    property var offsetValues: ["-", "-", "-"]
+    property var loadedMatrixValues: ["-", "-", "-", "-", "-", "-", "-", "-", "-"]
+    property var loadedOffsetValues: ["-", "-", "-"]
+    property var calculatedMatrixValues: ["-", "-", "-", "-", "-", "-", "-", "-", "-"]
+    property var calculatedOffsetValues: ["-", "-", "-"]
     property bool loadingParameters: false
     property bool savingSettings: false
     property bool savingCalibration: false
@@ -137,13 +140,18 @@ ScrollView {
         for (var matrixIndex = 0; matrixIndex < matrixParameterIds.length; ++matrixIndex) {
             matrix.push(parameterText(matrixParameterIds[matrixIndex], "-"))
         }
-        matrixValues = matrix
+        loadedMatrixValues = matrix
 
         var offsets = []
         for (var offsetIndex = 0; offsetIndex < offsetParameterIds.length; ++offsetIndex) {
             offsets.push(parameterText(offsetParameterIds[offsetIndex], "-"))
         }
-        offsetValues = offsets
+        loadedOffsetValues = offsets
+    }
+
+    function clearCalculatedCalibration() {
+        calculatedMatrixValues = ["-", "-", "-", "-", "-", "-", "-", "-", "-"]
+        calculatedOffsetValues = ["-", "-", "-"]
     }
 
     function applyCalculatedCalibration() {
@@ -156,14 +164,14 @@ ScrollView {
         for (var matrixIndex = 0; matrixIndex < computedMatrix.length; ++matrixIndex) {
             matrix.push(formatNumber(computedMatrix[matrixIndex]))
         }
-        matrixValues = matrix
+        calculatedMatrixValues = matrix
 
         var offsets = []
         var computedOffsets = magnetometerCalibration.hardIronOffsets
         for (var offsetIndex = 0; offsetIndex < computedOffsets.length; ++offsetIndex) {
             offsets.push(formatNumber(computedOffsets[offsetIndex]))
         }
-        offsetValues = offsets
+        calculatedOffsetValues = offsets
         calibrationDirty = true
         statusMessage = "Calibration calculated with "
                       + formatNumber(magnetometerCalibration.residualRmsPercent)
@@ -271,6 +279,7 @@ ScrollView {
             return
         }
         calibrationDirty = false
+        clearCalculatedCalibration()
         magnetometerCalibration.startCollection()
         statusMessage = "Collecting raw samples. Rotate the aircraft through every orientation."
     }
@@ -394,6 +403,7 @@ ScrollView {
                 root.calibrationDirty = false
                 magnetometerCalibration.stopCollection()
                 magnetometerCalibration.clearSamples()
+                root.clearCalculatedCalibration()
                 root.statusMessage = "Connect to a drone to load magnetometer settings"
             }
         }
@@ -490,7 +500,7 @@ ScrollView {
         StyledPanel {
             title: "Magnetometer Calibration"
             Layout.fillWidth: true
-            Layout.preferredHeight: 424
+            Layout.preferredHeight: root.compactCalibrationLayout ? 624 : 470
 
             ColumnLayout {
                 anchors.fill: parent
@@ -505,9 +515,33 @@ ScrollView {
                     wrapMode: Text.WordWrap
                 }
 
-                MatrixTable {
+                GridLayout {
                     Layout.fillWidth: true
-                    Layout.maximumWidth: 860
+                    Layout.maximumWidth: 1120
+                    columns: root.compactCalibrationLayout ? 1 : 2
+                    columnSpacing: 12
+                    rowSpacing: 10
+
+                    CalibrationValueCard {
+                        title: "Current on Drone"
+                        status: "Loaded parameters"
+                        statusColor: "#59616d"
+                        matrixValues: root.loadedMatrixValues
+                        offsetValues: root.loadedOffsetValues
+                        Layout.fillWidth: true
+                    }
+
+                    CalibrationValueCard {
+                        title: "Calculated New"
+                        status: !magnetometerCalibration.calibrationValid
+                                ? "Run Calculate"
+                                : root.calibrationDirty ? "Ready to save" : "Saved"
+                        statusColor: magnetometerCalibration.calibrationValid ? "#20834d" : "#7b8491"
+                        matrixValues: root.calculatedMatrixValues
+                        offsetValues: root.calculatedOffsetValues
+                        emphasized: magnetometerCalibration.calibrationValid
+                        Layout.fillWidth: true
+                    }
                 }
 
                 RowLayout {
@@ -726,7 +760,61 @@ ScrollView {
         }
     }
 
+    component CalibrationValueCard: Rectangle {
+        id: calibrationCard
+
+        property string title: ""
+        property string status: ""
+        property color statusColor: "#59616d"
+        property var matrixValues: ["-", "-", "-", "-", "-", "-", "-", "-", "-"]
+        property var offsetValues: ["-", "-", "-"]
+        property bool emphasized: false
+
+        implicitHeight: root.tableRowHeight * 4 + 52
+        radius: 5
+        color: emphasized ? "#f8faff" : "#ffffff"
+        border.color: emphasized ? "#b8c9fa" : "#d8dde4"
+        border.width: 1
+
+        ColumnLayout {
+            anchors.fill: parent
+            anchors.margins: 8
+            spacing: 6
+
+            RowLayout {
+                Layout.fillWidth: true
+                spacing: 8
+
+                Text {
+                    text: calibrationCard.title
+                    color: "#252b33"
+                    font.pixelSize: root.tableHeaderFontSize
+                    font.bold: true
+                }
+
+                Item { Layout.fillWidth: true }
+
+                Text {
+                    text: calibrationCard.status
+                    color: calibrationCard.statusColor
+                    font.pixelSize: root.inputFontSize
+                }
+            }
+
+            MatrixTable {
+                Layout.fillWidth: true
+                matrixValues: calibrationCard.matrixValues
+                offsetValues: calibrationCard.offsetValues
+            }
+        }
+    }
+
     component MatrixTable: Rectangle {
+        id: matrixTable
+
+        property var matrixValues: ["-", "-", "-", "-", "-", "-", "-", "-", "-"]
+        property var offsetValues: ["-", "-", "-"]
+
         implicitHeight: root.tableRowHeight * 4
         radius: 4
         color: "#ffffff"
@@ -750,28 +838,28 @@ ScrollView {
             }
             MatrixRow {
                 axis: "Corrected X"
-                xValue: root.matrixValues[0]
-                yValue: root.matrixValues[1]
-                zValue: root.matrixValues[2]
-                offset: root.offsetValues[0]
+                xValue: matrixTable.matrixValues[0]
+                yValue: matrixTable.matrixValues[1]
+                zValue: matrixTable.matrixValues[2]
+                offset: matrixTable.offsetValues[0]
                 Layout.fillWidth: true
                 Layout.preferredHeight: root.tableRowHeight
             }
             MatrixRow {
                 axis: "Corrected Y"
-                xValue: root.matrixValues[3]
-                yValue: root.matrixValues[4]
-                zValue: root.matrixValues[5]
-                offset: root.offsetValues[1]
+                xValue: matrixTable.matrixValues[3]
+                yValue: matrixTable.matrixValues[4]
+                zValue: matrixTable.matrixValues[5]
+                offset: matrixTable.offsetValues[1]
                 Layout.fillWidth: true
                 Layout.preferredHeight: root.tableRowHeight
             }
             MatrixRow {
                 axis: "Corrected Z"
-                xValue: root.matrixValues[6]
-                yValue: root.matrixValues[7]
-                zValue: root.matrixValues[8]
-                offset: root.offsetValues[2]
+                xValue: matrixTable.matrixValues[6]
+                yValue: matrixTable.matrixValues[7]
+                zValue: matrixTable.matrixValues[8]
+                offset: matrixTable.offsetValues[2]
                 Layout.fillWidth: true
                 Layout.preferredHeight: root.tableRowHeight
             }
